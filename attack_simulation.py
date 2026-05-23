@@ -1,13 +1,16 @@
 import pandas as pd
 import random
 import math
+import numpy as np
 import torch
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, MarianTokenizer, MarianMTModel
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, MarianTokenizer, MarianMTModel, AutoModelForCausalLM
 import os
 import warnings
+import re
 
 # 忽略警告，保持终端整洁
 warnings.filterwarnings("ignore")
@@ -26,8 +29,9 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 vocab_size = 50272 # OPT 词表大小
 
 print(">>> 正在初始化红蓝对抗双轨评估框架 <<<")
-print(f"[{device.upper()}] 加载目标分词器: {TARGET_MODEL}...")
+print(f"[{device.upper()}] 加载目标分词器与模型 (用于 SIRA 白盒/灰盒特征提取): {TARGET_MODEL}...")
 detector_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
 
 print(f"[{device.upper()}] 部署重写攻击大模型: {ATTACKER_MODEL}...")
 attacker_tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR)
@@ -106,13 +110,61 @@ def watermark_stealing_attack(text, algo_name, attack_type, tokenizer, vocab_siz
 
     return tokenizer.decode(tampered_tokens, skip_special_tokens=True)
 
+# --- SIRA 核心组件 ---
+def calculate_token_self_information(text, model, tokenizer, device):
+    inputs = tokenizer(text, return_tensors="pt").to(device)
+    input_ids = inputs.input_ids
+    if input_ids.shape[1] <= 1: return [], []
+    with torch.no_grad(): outputs = model(input_ids)
+    logits = outputs.logits[0, :-1, :]
+    target_ids = input_ids[0, 1:]
+    probs = F.softmax(logits, dim=-1)
+    token_probs = probs.gather(1, target_ids.unsqueeze(1)).squeeze(-1)
+    self_info = -torch.log2(token_probs + 1e-10)
+    tokens = tokenizer.convert_ids_to_tokens(target_ids)
+    return tokens, self_info.cpu().numpy()
+
+def sira_masking(text, model, tokenizer, mask_ratio=0.2, device="cuda"):
+    tokens, self_info_scores = calculate_token_self_information(text, model, tokenizer, device)
+    if not tokens or len(tokens) < 5: return text
+    num_to_mask = max(1, int(len(tokens) * mask_ratio))
+    highest_entropy_indices = np.argsort(self_info_scores)[-num_to_mask:]
+    masked_tokens = []
+    mask_count = 0
+    i = 0
+    while i < len(tokens):
+        if i in highest_entropy_indices:
+            masked_tokens.append(f"<extra_id_{mask_count}>")
+            mask_count += 1
+            while i < len(tokens) and i in highest_entropy_indices: i += 1
+            continue
+        else:
+            clean_token = tokens[i].replace('Ġ', ' ').replace('Ċ', '\n')
+            masked_tokens.append(clean_token)
+            i += 1
+    return "".join(masked_tokens).strip()
+
+def sira_t5_infilling(masked_text, attacker_model, attacker_tokenizer, device):
+    if "<extra_id_" not in masked_text: return masked_text
+    inputs = attacker_tokenizer(masked_text, return_tensors="pt", max_length=512, truncation=True).to(device)
+    with torch.no_grad():
+        outputs = attacker_model.generate(**inputs, max_length=512, num_beams=4, temperature=0.8, do_sample=True, early_stopping=True)
+    filled_content = attacker_tokenizer.decode(outputs[0], skip_special_tokens=True)
+    final_text = masked_text
+    parts = [p.strip() for p in filled_content.split("<extra_id_") if p.strip()]
+    for i, part in enumerate(parts):
+        if '>' in part:
+            clean_part = part.split('>', 1)[1].strip()
+            final_text = final_text.replace(f"<extra_id_{i}>", " " + clean_part + " ")
+    final_text = re.sub(r'<extra_id_\d+>', '', final_text)
+    return final_text.replace("  ", " ").strip()
+# ---------------------
+
 def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_key=15485863):
     if algo_name == "Natural": return 0.0
-    
     tokens = tokenizer.encode(text, return_tensors="pt")[0]
     total_tokens = len(tokens) - 1
     if total_tokens <= 0: return 0.0
-
     green_tokens_count = 0
 
     if algo_name in ["KGW", "SWEET", "DiPmark"]:
@@ -160,25 +212,19 @@ sns.set_theme(style="whitegrid", palette="deep")
 plt.rcParams['font.sans-serif'] = ['Arial']
 
 # ================= 4. 测试一：Word Drop 鲁棒性退化测试 =================
-print("\n[测试阶段 1/3] 开始 Word Drop (删词) 退化测试...")
+print("\n[测试阶段 1/4] 开始 Word Drop (删词) 退化测试...")
 attack_ratios = [0.0, 0.1, 0.3, 0.5]
 results_history_drop = {algo: [] for algo in algorithms}
 
 for ratio in attack_ratios:
-    print(f"  > 攻击强度 {int(ratio*100)}% ...")
     for algo in algorithms:
-        current_z_scores = [detect_watermark(simulate_word_drop(text, ratio), algo, detector_tokenizer, vocab_size) 
-                            for text in df[f"Text_{algo}"]]
+        current_z_scores = [detect_watermark(simulate_word_drop(text, ratio), algo, detector_tokenizer, vocab_size) for text in df[f"Text_{algo}"]]
         avg_z = sum(current_z_scores) / len(current_z_scores) if current_z_scores else 0.0
         results_history_drop[algo].append(avg_z)
 
 df_drop_summary = pd.DataFrame(results_history_drop)
-# 修改列名为带单位的明确指示
 df_drop_summary.index = [f"Drop {int(r*100)}%" for r in attack_ratios]
 summary_table_1 = df_drop_summary.T.round(3)
-
-print("\n=== [数据表] Word Drop (删词) 平均 Z-Score 退化汇总 ===")
-print(summary_table_1.to_markdown())
 
 fig = plt.figure(figsize=(14, 6)) 
 gs = fig.add_gridspec(1, 2, width_ratios=[2.5, 1]) 
@@ -196,25 +242,20 @@ all_drop_scores = [score for scores in results_history_drop.values() for score i
 ax1.set_ylim(min(min(all_drop_scores) - 0.5, -0.5), max(max(all_drop_scores) + 0.5, 4.5))
 ax1.legend()
 
-# [核心修复]: 将索引重置为普通列，赋予明确的表头与单位
 table1_data = summary_table_1.reset_index()
 table1_data.rename(columns={'index': 'Algorithm\n(Z-Score)'}, inplace=True)
-
 ax2.axis('off')
 ax2.set_title('Data Summary (Metric: Z-Score)', fontsize=13, fontweight='bold', pad=10)
-# 放弃使用 rowLabels，直接画成完整的网格
 table1 = ax2.table(cellText=table1_data.values, colLabels=table1_data.columns, loc='center', cellLoc='center')
 table1.auto_set_font_size(False)
 table1.set_fontsize(10)
-table1.scale(1, 2.5) # 拉伸行高，使内容不再拥挤
-
+table1.scale(1, 2.5) 
 plt.tight_layout()
 plt.savefig("attack_1_word_drop.png", dpi=300, bbox_inches='tight')
-print("  >>> 图表 1 已保存: attack_1_word_drop.png")
 plt.close()
 
 # ================= 5. 测试二：高级洗稿与跨语言打击测试 =================
-print("\n[测试阶段 2/3] 开始 LLM Rewrite 与 CWRA 跨语言纵深打击...")
+print("\n[测试阶段 2/4] 开始 LLM Rewrite 与 CWRA 跨语言纵深打击...")
 sample_df = df.dropna(subset=[f"Text_{algorithms[0]}"]).sample(n=min(20, len(df)), random_state=42)
 attack_results_complex = []
 
@@ -222,18 +263,14 @@ for idx, row in tqdm(sample_df.iterrows(), total=len(sample_df), desc="高级攻
     for algo in algorithms:
         original_text = row[f"Text_{algo}"]
         attack_results_complex.append({"Algorithm": algo, "State": "1_Before Attack", "Z_Score": detect_watermark(original_text, algo, detector_tokenizer, vocab_size)})
-        
         t5_attacked_text = llm_paraphrase_attack(original_text)
         attack_results_complex.append({"Algorithm": algo, "State": "2_After T5 Rewrite", "Z_Score": detect_watermark(t5_attacked_text, algo, detector_tokenizer, vocab_size)})
-
         cwra_attacked_text = cwra_translation_attack(original_text)
         attack_results_complex.append({"Algorithm": algo, "State": "3_After CWRA", "Z_Score": detect_watermark(cwra_attacked_text, algo, detector_tokenizer, vocab_size)})
 
 results_df = pd.DataFrame(attack_results_complex)
 summary_table_2 = results_df.groupby(['Algorithm', 'State'])['Z_Score'].mean().unstack('State').round(3)
 summary_table_2.columns = [col.split('_')[1] for col in summary_table_2.columns]
-print("\n=== [数据表] 高级改写攻击 Z-Score 平均值退化汇总 ===")
-print(summary_table_2.to_markdown())
 
 results_df['State'] = results_df['State'].apply(lambda x: x.split('_')[1])
 fig2 = plt.figure(figsize=(16, 6))
@@ -251,24 +288,20 @@ all_complex_scores = results_df["Z_Score"].tolist()
 ax2_1.set_ylim(min(min(all_complex_scores) - 0.5, -0.5), max(max(all_complex_scores) + 0.5, 4.5))
 ax2_1.legend(loc='upper left', bbox_to_anchor=(1.02, 1))
 
-# [核心修复]: 图 2 表格优化
 table2_data = summary_table_2.reset_index()
 table2_data.rename(columns={'Algorithm': 'Algorithm\n(Z-Score)'}, inplace=True)
-
 ax2_2.axis('off')
 ax2_2.set_title('Data Summary (Metric: Z-Score)', fontsize=13, fontweight='bold', pad=10)
 table2 = ax2_2.table(cellText=table2_data.values, colLabels=table2_data.columns, loc='center', cellLoc='center')
 table2.auto_set_font_size(False)
 table2.set_fontsize(10)
 table2.scale(1, 2.5)
-
 plt.tight_layout()
 plt.savefig("attack_2_complex_rewrite.png", dpi=300, bbox_inches='tight')
-print("  >>> 图表 2 已保存: attack_2_complex_rewrite.png")
 plt.close()
 
 # ================= 6. 测试三：黑盒 API 逆向窃取与伪造攻击 (WS) =================
-print("\n[测试阶段 3/3] 开始黑盒 API 逆向窃取 (Watermark Stealing) 模拟...")
+print("\n[测试阶段 3/4] 开始黑盒 API 逆向窃取 (Watermark Stealing) 模拟...")
 ws_results = []
 sample_ws_df = df.head(20)
 
@@ -296,8 +329,6 @@ df_ws = pd.DataFrame(ws_results)
 summary_table_3 = df_ws.pivot_table(values='Z_Score', index=['Algorithm', 'Category'], columns='State', aggfunc='mean').round(3)
 summary_table_3.columns = [col.split('_')[1] for col in summary_table_3.columns]
 summary_table_3 = summary_table_3.fillna("-")
-print("\n=== [数据表] 黑盒水印窃取 (WS) 平均 Z-Score 变化汇总 ===")
-print(summary_table_3.to_markdown())
 
 df_ws['State'] = df_ws['State'].apply(lambda x: x.split('_')[1])
 fig3 = plt.figure(figsize=(19, 6))
@@ -322,22 +353,67 @@ ax3_2.set_title('WS Attack: Spoofing (Forge)', fontsize=14, fontweight='bold')
 ax3_2.set_ylabel('Z-Score', fontsize=13)
 ax3_2.legend(loc='upper left')
 
-# [核心修复]: 图 3 表格优化
 table3_data = summary_table_3.reset_index()
-# 加入单位并压缩名字防止重叠
 table3_data.rename(columns={'Algorithm': 'Algo\n(Z-Score)', 'Category': 'Attack Type'}, inplace=True)
-
 ax3_3.axis('off')
 ax3_3.set_title('Data Summary (Metric: Z-Score)', fontsize=13, fontweight='bold', pad=10)
 table3 = ax3_3.table(cellText=table3_data.values, colLabels=table3_data.columns, loc='center', cellLoc='center')
 table3.auto_set_font_size(False)
 table3.set_fontsize(10)
 table3.scale(1, 2.5)
-table3.auto_set_column_width(col=list(range(len(table3_data.columns)))) # 智能匹配列宽
-
+table3.auto_set_column_width(col=list(range(len(table3_data.columns))))
 plt.tight_layout()
 plt.savefig("attack_3_watermark_stealing.png", dpi=300, bbox_inches='tight')
-print("  >>> 图表 3 已保存: attack_3_watermark_stealing.png")
+plt.close()
+
+# ================= 7. 测试四：SIRA 自信息靶向重写攻击 =================
+print("\n[测试阶段 4/4] 开始 SIRA 高熵靶向重写降维打击...")
+sira_results = []
+sample_sira_df = df.dropna(subset=[f"Text_{algorithms[0]}"]).sample(n=min(20, len(df)), random_state=42)
+
+for idx, row in tqdm(sample_sira_df.iterrows(), total=len(sample_sira_df), desc="SIRA 定向手术刀攻击"):
+    for algo in algorithms:
+        if algo == "Natural": continue
+        original_text = row[f"Text_{algo}"]
+        z_before = detect_watermark(original_text, algo, detector_tokenizer, vocab_size)
+        masked_text = sira_masking(original_text, target_model, detector_tokenizer, mask_ratio=0.2, device=device)
+        sira_attacked_text = sira_t5_infilling(masked_text, attacker_model, attacker_tokenizer, device)
+        z_after = detect_watermark(sira_attacked_text, algo, detector_tokenizer, vocab_size)
+        
+        sira_results.append({"Algorithm": algo, "State": "1_Before SIRA", "Z_Score": z_before})
+        sira_results.append({"Algorithm": algo, "State": "2_After SIRA (20% Edit)", "Z_Score": z_after})
+
+sira_df = pd.DataFrame(sira_results)
+summary_table_4 = sira_df.groupby(['Algorithm', 'State'])['Z_Score'].mean().unstack('State').round(3)
+summary_table_4.columns = [col.split('_')[1] for col in summary_table_4.columns]
+print("\n=== [数据表] SIRA 高熵靶向重写 Z-Score 骤降汇总 ===")
+print(summary_table_4.to_markdown())
+
+sira_df['State'] = sira_df['State'].apply(lambda x: x.split('_')[1])
+fig4 = plt.figure(figsize=(14, 6))
+gs4 = fig4.add_gridspec(1, 2, width_ratios=[2, 1.2])
+ax4_1 = fig4.add_subplot(gs4[0])
+ax4_2 = fig4.add_subplot(gs4[1])
+
+sns.boxplot(x="Algorithm", y="Z_Score", hue="State", data=sira_df, ax=ax4_1, width=0.6, showfliers=False)
+sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=sira_df, ax=ax4_1, dodge=True, color='black', alpha=0.3)
+ax4_1.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold (z=4.0)')
+ax4_1.set_title('Attack Test 4: SIRA (Self-Information Rewrite Attack)', fontsize=14, fontweight='bold')
+ax4_1.set_ylabel('Z-Score', fontsize=13)
+ax4_1.legend(loc='upper right')
+
+table4_data = summary_table_4.reset_index()
+table4_data.rename(columns={'Algorithm': 'Algo\n(Z-Score)'}, inplace=True)
+ax4_2.axis('off')
+ax4_2.set_title('Data Summary (Metric: Z-Score)', fontsize=13, fontweight='bold', pad=10)
+table4 = ax4_2.table(cellText=table4_data.values, colLabels=table4_data.columns, loc='center', cellLoc='center')
+table4.auto_set_font_size(False)
+table4.set_fontsize(10)
+table4.scale(1, 2.5)
+table4.auto_set_column_width(col=list(range(len(table4_data.columns))))
+plt.tight_layout()
+plt.savefig("attack_4_sira_targeted.png", dpi=300, bbox_inches='tight')
+print("  >>> 图表 4 已保存: attack_4_sira_targeted.png")
 plt.close()
 
 print("\n=== 所有攻击模拟与评估测试圆满完成！===")
