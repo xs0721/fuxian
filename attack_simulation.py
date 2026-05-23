@@ -252,6 +252,7 @@ table1.set_fontsize(10)
 table1.scale(1, 2.5) 
 plt.tight_layout()
 plt.savefig("attack_1_word_drop.png", dpi=300, bbox_inches='tight')
+plt.show()
 plt.close()
 
 # ================= 5. 测试二：高级洗稿与跨语言打击测试 =================
@@ -298,6 +299,7 @@ table2.set_fontsize(10)
 table2.scale(1, 2.5)
 plt.tight_layout()
 plt.savefig("attack_2_complex_rewrite.png", dpi=300, bbox_inches='tight')
+plt.show()
 plt.close()
 
 # ================= 6. 测试三：黑盒 API 逆向窃取与伪造攻击 (WS) =================
@@ -364,6 +366,7 @@ table3.scale(1, 2.5)
 table3.auto_set_column_width(col=list(range(len(table3_data.columns))))
 plt.tight_layout()
 plt.savefig("attack_3_watermark_stealing.png", dpi=300, bbox_inches='tight')
+plt.show()
 plt.close()
 
 # ================= 7. 测试四：SIRA 自信息靶向重写攻击 =================
@@ -414,6 +417,7 @@ table4.auto_set_column_width(col=list(range(len(table4_data.columns))))
 plt.tight_layout()
 plt.savefig("attack_4_sira_targeted.png", dpi=300, bbox_inches='tight')
 print("  >>> 图表 4 已保存: attack_4_sira_targeted.png")
+plt.show()
 plt.close()
 
 print("\n=== 所有攻击模拟与评估测试圆满完成！===")
