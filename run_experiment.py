@@ -176,7 +176,7 @@ def calculate_ppl(text, model, tokenizer, device):
 
 
 # ================= ===================================
-# 3. 自动化绘图引擎定义
+# 3. 自动化绘图引擎定义 (优化版：带统计表格的 2x2 布局)
 # ================= ===================================
 def generate_benchmark_plots(csv_path):
     print(f"\n[可视化生成] 正在读取数据并自动生成高级学术图表...")
@@ -188,26 +188,32 @@ def generate_benchmark_plots(csv_path):
     plt.rcParams['font.sans-serif'] = ['Arial']
     plt.rcParams['axes.unicode_minus'] = False
 
-    fig, axes = plt.subplots(1, 3, figsize=(20, 6))
+    # 改为 2x2 布局：上方两个箱型图，左下散点图，右下数据表
+    fig = plt.figure(figsize=(20, 14))
+    gs = fig.add_gridspec(2, 2, height_ratios=[1, 1.2]) 
+    ax1 = fig.add_subplot(gs[0, 0]) # 图 1: Z-Score Boxplot
+    ax2 = fig.add_subplot(gs[0, 1]) # 图 2: PPL Boxplot
+    ax3 = fig.add_subplot(gs[1, 0]) # 图 3: 散点图
+    ax4 = fig.add_subplot(gs[1, 1]) # 图 4: 统计表格
 
     # 图 1：Z-Score 分布
     z_cols = [f"Z_Score_{a}" for a in algorithms]
     z_df = pd.melt(df, value_vars=z_cols, var_name="Algorithm", value_name="Z-Score")
     z_df["Algorithm"] = z_df["Algorithm"].str.replace("Z_Score_", "")
-    sns.boxplot(x='Algorithm', y='Z-Score', data=z_df, ax=axes[0], width=0.6, showfliers=False)
-    sns.stripplot(x='Algorithm', y='Z-Score', data=z_df, ax=axes[0], color='black', alpha=0.4, jitter=True)
-    axes[0].axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold (z=4.0)')
-    axes[0].set_title('Detectability: Z-Score Distribution', fontsize=15, pad=15, fontweight='bold')
-    axes[0].legend()
+    sns.boxplot(x='Algorithm', y='Z-Score', data=z_df, ax=ax1, width=0.6, showfliers=False)
+    sns.stripplot(x='Algorithm', y='Z-Score', data=z_df, ax=ax1, color='black', alpha=0.4, jitter=True)
+    ax1.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold (z=4.0)')
+    ax1.set_title('Detectability: Z-Score Distribution', fontsize=15, pad=15, fontweight='bold')
+    ax1.legend()
 
     # 图 2：PPL 质量分布
     p_cols = [f"PPL_{a}" for a in algorithms]
     p_df = pd.melt(df, value_vars=p_cols, var_name="Algorithm", value_name="PPL")
     p_df["Algorithm"] = p_df["Algorithm"].str.replace("PPL_", "")
-    sns.boxplot(x='Algorithm', y='PPL', data=p_df, ax=axes[1], width=0.6, showfliers=False)
-    sns.stripplot(x='Algorithm', y='PPL', data=p_df, ax=axes[1], color='black', alpha=0.4, jitter=True)
-    axes[1].set_title('Quality Impact: Perplexity (PPL)', fontsize=15, pad=15, fontweight='bold')
-    axes[1].set_ylabel('Perplexity (Lower is Better)', fontsize=13)
+    sns.boxplot(x='Algorithm', y='PPL', data=p_df, ax=ax2, width=0.6, showfliers=False)
+    sns.stripplot(x='Algorithm', y='PPL', data=p_df, ax=ax2, color='black', alpha=0.4, jitter=True)
+    ax2.set_title('Quality Impact: Perplexity (PPL)', fontsize=15, pad=15, fontweight='bold')
+    ax2.set_ylabel('Perplexity (Lower is Better)', fontsize=13)
 
     # 图 3：Pareto 权衡前沿散点图
     markers = ['o', 's', '^', 'D', 'v', 'p', '*']
@@ -218,22 +224,23 @@ def generate_benchmark_plots(csv_path):
         ppl_jitter = df[f'PPL_{algo}'] + np.random.normal(0, 0.4, size=len(df))
         z_jitter = df[f'Z_Score_{algo}'] + np.random.normal(0, 0.1, size=len(df))
         
-        scatter = axes[2].scatter(ppl_jitter, z_jitter, alpha=0.4, label=algo, s=25, 
+        scatter = ax3.scatter(ppl_jitter, z_jitter, alpha=0.4, label=algo, s=25, 
                                   marker=markers[idx % len(markers)], color=colors[idx], 
                                   edgecolors='white', linewidth=0.3, picker=True, pickradius=5)
         scatter_collections[algo] = {'scatter': scatter, 'color': colors[idx], 'marker': markers[idx % len(markers)]}
     
-    axes[2].axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2)
-    axes[2].set_title('Trade-off: Quality vs. Detectability\n(Hover mouse over points to see details)', 
+    ax3.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2)
+    ax3.set_title('Trade-off: Quality vs. Detectability\n(Hover mouse over points to see details)', 
                       fontsize=15, pad=15, fontweight='bold')
-    axes[2].set_xlabel('Perplexity (Lower is better)', fontsize=13)
-    axes[2].set_ylabel('Z-Score (Higher is better)', fontsize=13)
+    ax3.set_xlabel('Perplexity (Lower is better)', fontsize=13)
+    ax3.set_ylabel('Z-Score (Higher is better)', fontsize=13)
     
-    axes[2].set_xlim(0, 50) 
-    axes[2].set_ylim(-5, 8) 
-    axes[2].legend(title="Algorithm", loc="lower right", fontsize=10)
+    ax3.set_xlim(0, 50) 
+    ax3.set_ylim(-5, 8) 
+    ax3.legend(title="Algorithm", loc="lower right", fontsize=10)
 
-    cursor = mplcursors.cursor(axes[2].collections, hover=True)
+    # 保持原有的悬停交互功能
+    cursor = mplcursors.cursor(ax3.collections, hover=True)
     @cursor.connect("add")
     def on_add(sel):
         artist = sel.artist
@@ -263,11 +270,29 @@ def generate_benchmark_plots(csv_path):
             sc.set_edgecolors('white')
             sc.set_linewidth(0.3)
         plt.draw()
+
+    # 图 4：数据汇总表格 (Mean ± Std)
+    summary_data = []
+    for algo in algorithms:
+        z_mean = df[f"Z_Score_{algo}"].mean()
+        z_std = df[f"Z_Score_{algo}"].std()
+        ppl_mean = df[f"PPL_{algo}"].mean()
+        ppl_std = df[f"PPL_{algo}"].std()
+        summary_data.append([algo, f"{z_mean:.2f} ± {z_std:.2f}", f"{ppl_mean:.2f} ± {ppl_std:.2f}"])
     
+    table_df = pd.DataFrame(summary_data, columns=["Algorithm", "Z-Score (Mean±Std)", "PPL (Mean±Std)"])
+    
+    ax4.axis('off')
+    ax4.set_title('Statistical Summary Table', fontsize=15, fontweight='bold', pad=15)
+    table = ax4.table(cellText=table_df.values, colLabels=table_df.columns, loc='center', cellLoc='center')
+    table.auto_set_font_size(False)
+    table.set_fontsize(12)
+    table.scale(1, 2.5) # 拉伸表格行高
+
     plt.tight_layout()
     output_filename = "benchmark_comparison_plot.png"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
-    print(f"高级对比图表已成功保存至: {output_filename}")
+    print(f"高级对比图表（含数据表）已成功保存至: {output_filename}")
     plt.show()
 
 
