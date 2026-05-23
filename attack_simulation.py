@@ -420,4 +420,102 @@ print("  >>> 图表 4 已保存: attack_4_sira_targeted.png")
 plt.show()
 plt.close()
 
+# ================= 8. 测试五：哈希窗口大小的博弈权衡 =================
+print("\n[测试阶段 5/5] 开始哈希窗口大小 (h) 的多维博弈权衡分析...")
+print("  >>> 正在验证第五章 5.2: 鲁棒性与窃取难度的天然冲突")
+
+# 定义不同窗口大小的简化版 KGW 水印模拟器 (为了快速测试)
+def simulate_kgw_with_window(text, window_size, drop_ratio=0.0):
+    tokens = detector_tokenizer.encode(text, add_special_tokens=False)
+    if len(tokens) <= window_size: return 0.0, 0
+    
+    # 模拟无目标攻击 (Word Drop) 对哈希链的破坏
+    tampered_tokens = tokens.copy()
+    if drop_ratio > 0:
+        num_drop = int(len(tokens) * drop_ratio)
+        drop_indices = set(random.sample(range(window_size, len(tokens)), num_drop))
+        tampered_tokens = [t for i, t in enumerate(tokens) if i not in drop_indices]
+        
+    if len(tampered_tokens) <= window_size: return 0.0, 0
+
+    green_count = 0
+    gamma = 0.5
+    total = len(tampered_tokens) - window_size
+    
+    # 窃取难度代理指标：需要穷举的前缀组合数 (简化模拟)
+    # h=1 时，需要探索 vocab_size 个组合
+    # h=2 时，需要探索 vocab_size^2 个组合
+    # 这里用对数刻度来表示窃取成本 (Stealing Cost)
+    stealing_complexity_log = window_size * math.log10(vocab_size)
+    
+    for i in range(window_size, len(tampered_tokens)):
+        # 哈希种子依赖于前 window_size 个 token
+        prefix_sum = sum(tampered_tokens[i-window_size:i])
+        torch.manual_seed(15485863 * prefix_sum) 
+        if (torch.rand(vocab_size) < gamma)[tampered_tokens[i]]:
+            green_count += 1
+            
+    variance = total * gamma * (1 - gamma)
+    z_score = (green_count - (total * gamma)) / math.sqrt(variance) if variance > 0 else 0.0
+    
+    return z_score, stealing_complexity_log
+
+window_sizes = [1, 2, 3]
+tradeoff_results = []
+sample_tradeoff_df = df.head(30) # 取 30 条自然文本作为基座生成
+
+for h in window_sizes:
+    avg_z_robust = 0
+    avg_complexity = 0
+    
+    for _, row in sample_tradeoff_df.iterrows():
+        base_text = row.get("Text_Natural", "The quick brown fox jumps over the lazy dog.")
+        
+        # 假设生成阶段是完美的 (Z-Score 会很高)，我们直接测试攻击后的保留度
+        z_robust, complexity = simulate_kgw_with_window(base_text, h, drop_ratio=0.3)
+        avg_z_robust += z_robust
+        avg_complexity = complexity # 复杂度只和 h 有关，不随文本变化
+        
+    avg_z_robust /= len(sample_tradeoff_df)
+    
+    tradeoff_results.append({
+        "Window Size (h)": h,
+        "Robustness (Z-Score after 30% Drop)": avg_z_robust,
+        "Security (Log10 Stealing Cost)": avg_complexity
+    })
+
+df_tradeoff = pd.DataFrame(tradeoff_results)
+print("\n=== [数据表] 哈希窗口博弈权衡分析 ===")
+print(df_tradeoff.to_markdown(index=False))
+
+# --- 绘制双轴“X型”博弈权衡图 ---
+fig5, ax5_1 = plt.subplots(figsize=(10, 6))
+
+color1 = '#d9534f' # 红色表示 Z-Score (鲁棒性)
+ax5_1.set_xlabel('Hash Window Size ($h$)', fontsize=13, fontweight='bold')
+ax5_1.set_ylabel('Robustness: Z-Score (under 30% Drop Attack)', color=color1, fontsize=13, fontweight='bold')
+ax5_1.plot(df_tradeoff["Window Size (h)"], df_tradeoff["Robustness (Z-Score after 30% Drop)"], 
+           color=color1, marker='o', linewidth=3, markersize=10, label="Robustness")
+ax5_1.tick_params(axis='y', labelcolor=color1)
+ax5_1.set_xticks(window_sizes)
+# 设定阈值红线
+ax5_1.axhline(y=4.0, color=color1, linestyle='--', linewidth=1.5, alpha=0.6)
+
+# 实例化第二个共享 x 轴的 y 轴
+ax5_2 = ax5_1.twinx()  
+color2 = '#1f77b4' # 蓝色表示窃取成本 (安全性)
+ax5_2.set_ylabel('Security: Log10 Stealing Cost (API Queries)', color=color2, fontsize=13, fontweight='bold')
+ax5_2.plot(df_tradeoff["Window Size (h)"], df_tradeoff["Security (Log10 Stealing Cost)"], 
+           color=color2, marker='s', linewidth=3, markersize=10, label="Security (Stealing Cost)")
+ax5_2.tick_params(axis='y', labelcolor=color2)
+
+plt.title('Game Theory Trade-off: Window Size $h$ vs. Robustness & Security', fontsize=15, pad=20, fontweight='bold')
+fig5.tight_layout()
+plt.savefig("attack_5_window_tradeoff.png", dpi=300, bbox_inches='tight')
+print("  >>> 图表 5 已保存: attack_5_window_tradeoff.png")
+plt.show() # 弹窗显示最终压轴图表
+plt.close()
+
+print("\n=== [实验终局] 所有理论推演与攻防模拟全部圆满完成！ ===")
+
 print("\n=== 所有攻击模拟与评估测试圆满完成！===")
