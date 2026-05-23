@@ -4,7 +4,7 @@ import math
 import mplcursors 
 import os
 import pandas as pd
-import numpy as np  # <-- 新增：用于生成散点图抖动噪声
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
@@ -21,6 +21,10 @@ DELTA_VALUE = 2.0
 PROMPT_LENGTH = 30
 GENERATE_LENGTH = 50
 CSV_FILENAME = "watermark_benchmark_results.csv"
+
+# 获取当前脚本的绝对路径，并强制切换工作目录到这里
+current_dir = os.path.dirname(os.path.abspath(__file__))
+os.chdir(current_dir)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"正在加载 {MODEL_NAME} 到 {device}...")
@@ -61,6 +65,39 @@ class SWEETLogitsProcessor(LogitsProcessor):
                 scores[b, torch.rand(self.vocab_size) < self.gamma] += self.delta
         return scores
 
+
+class DiPmarkLogitsProcessor(LogitsProcessor):
+    """
+    分布保持水印 (Distribution-Preserving Watermark) 的代理实现。
+    不使用生硬的常数 Logits 偏置，而是在概率空间进行重加权，尽量维持原生分布的 PPL 质量。
+    """
+    def __init__(self, vocab_size, gamma=0.5, alpha=0.6, hash_key=15485863):
+        self.vocab_size = vocab_size
+        self.gamma = gamma
+        self.alpha = alpha  # 控制重加权强度的参数
+        self.hash_key = hash_key
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            torch.manual_seed(self.hash_key * input_ids[b, -1].item())
+            green_mask = torch.rand(self.vocab_size).to(scores.device) < self.gamma
+            
+            # 计算原生的 Softmax 概率分布
+            probs = F.softmax(scores[b], dim=-1)
+            
+            # 分布保持核心：在概率空间进行平滑缩放，而非在 Logits 空间粗暴相加
+            reweighted_probs = probs.clone()
+            reweighted_probs[green_mask] *= (1.0 + self.alpha)
+            reweighted_probs[~green_mask] *= (1.0 - self.alpha)
+            
+            # 重新归一化以保证概率总和为 1
+            reweighted_probs = reweighted_probs / reweighted_probs.sum()
+            
+            # 安全地映射回 Logits 空间
+            scores[b] = torch.log(reweighted_probs + 1e-10)
+        return scores
+
+
 class UnigramLogitsProcessor(LogitsProcessor):
     def __init__(self, vocab_size, gamma=0.5, delta=2.0, secret_key=42):
         self.vocab_size = vocab_size
@@ -69,7 +106,6 @@ class UnigramLogitsProcessor(LogitsProcessor):
         self.green_mask = (torch.rand(vocab_size) < gamma)
 
     def __call__(self, input_ids, scores):
-        # ✅ 加上了 .to(scores.device)，让绿名单和模型输出在同一个显卡上相遇！
         scores[:, self.green_mask.to(scores.device)] += self.delta
         return scores
 
@@ -85,9 +121,10 @@ class SemStampLogitsProcessor(LogitsProcessor):
             scores[:, :100] += self.threshold
         return scores
 
+
 def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_key=15485863):
     """
-    智能路由检测引擎：根据不同的水印代际，调用对应的统计学或语义学检测雷达。
+    智能路由检测引擎
     """
     if algo_name == "Natural": return 0.0
     
@@ -97,10 +134,8 @@ def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_k
 
     green_tokens_count = 0
 
-    # ---------------------------------------------------------
-    # 雷达 A：前缀哈希检测器 (针对 KGW / SWEET)
-    # ---------------------------------------------------------
-    if algo_name in ["KGW", "SWEET"]:
+    # 雷达 A：前缀哈希检测器 (加入 DiPmark)
+    if algo_name in ["KGW", "SWEET", "DiPmark"]:
         for i in range(1, len(tokens)):
             torch.manual_seed(secret_key * tokens[i - 1].item())
             if (torch.rand(vocab_size) < gamma)[tokens[i].item()]:
@@ -108,11 +143,9 @@ def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_k
         variance = total_tokens * gamma * (1 - gamma)
         return (green_tokens_count - (total_tokens * gamma)) / math.sqrt(variance) if variance > 0 else 0.0
 
-    # ---------------------------------------------------------
-    # 雷达 B：全局固定哈希检测器 (针对 Unigram)
-    # ---------------------------------------------------------
+    # 雷达 B：全局固定哈希检测器
     elif algo_name == "Unigram":
-        torch.manual_seed(42) # 对应生成时的 secret_key
+        torch.manual_seed(42)
         green_mask = (torch.rand(vocab_size) < gamma)
         for i in range(1, len(tokens)):
             if green_mask[tokens[i].item()]:
@@ -120,27 +153,20 @@ def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_k
         variance = total_tokens * gamma * (1 - gamma)
         return (green_tokens_count - (total_tokens * gamma)) / math.sqrt(variance) if variance > 0 else 0.0
 
-    # ---------------------------------------------------------
-    # 雷达 C：轻量级语义向量检测器 (针对 SemStamp)
-    # ---------------------------------------------------------
+    # 雷达 C：轻量级语义向量检测器
     elif algo_name == "SemStamp":
-        # 真实的 SemStamp 需加载 Sentence-BERT 计算 LSH（局部敏感哈希）距离。
-        # 为了不拖慢实验框架的速度，这里使用与生成器对齐的“代理语义靶区”来计算 Z-Score。
-        # 它能完美模拟语义水印在检测端的信号恢复过程。
         target_zone_ratio = 100 / vocab_size
         for i in range(1, len(tokens)):
-            if tokens[i].item() < 100: # 命中预设的语义向量约束区
+            if tokens[i].item() < 100: 
                 green_tokens_count += 1
-                
-        # 语义空间碰撞的统计学放大
         effective_count = green_tokens_count * (vocab_size / 2000) 
         variance = total_tokens * target_zone_ratio * (1 - target_zone_ratio)
         if variance == 0: return 0.0
-        
         z_score = (effective_count - (total_tokens * target_zone_ratio)) / math.sqrt(variance)
-        return min(z_score, 8.5) # 加上物理上限，防止溢出
+        return min(z_score, 8.5) 
         
     return 0.0
+
 
 def calculate_ppl(text, model, tokenizer, device):
     encodings = tokenizer(text, return_tensors="pt").to(device)
@@ -150,7 +176,7 @@ def calculate_ppl(text, model, tokenizer, device):
 
 
 # ================= ===================================
-# 3. 自动化绘图引擎定义（增加悬停交互）
+# 3. 自动化绘图引擎定义
 # ================= ===================================
 def generate_benchmark_plots(csv_path):
     print(f"\n[可视化生成] 正在读取数据并自动生成高级学术图表...")
@@ -164,7 +190,7 @@ def generate_benchmark_plots(csv_path):
 
     fig, axes = plt.subplots(1, 3, figsize=(20, 6))
 
-    # 图 1：Z-Score 分布箱线图
+    # 图 1：Z-Score 分布
     z_cols = [f"Z_Score_{a}" for a in algorithms]
     z_df = pd.melt(df, value_vars=z_cols, var_name="Algorithm", value_name="Z-Score")
     z_df["Algorithm"] = z_df["Algorithm"].str.replace("Z_Score_", "")
@@ -174,7 +200,7 @@ def generate_benchmark_plots(csv_path):
     axes[0].set_title('Detectability: Z-Score Distribution', fontsize=15, pad=15, fontweight='bold')
     axes[0].legend()
 
-    # 图 2：PPL 质量分布箱线图
+    # 图 2：PPL 质量分布
     p_cols = [f"PPL_{a}" for a in algorithms]
     p_df = pd.melt(df, value_vars=p_cols, var_name="Algorithm", value_name="PPL")
     p_df["Algorithm"] = p_df["Algorithm"].str.replace("PPL_", "")
@@ -183,35 +209,19 @@ def generate_benchmark_plots(csv_path):
     axes[1].set_title('Quality Impact: Perplexity (PPL)', fontsize=15, pad=15, fontweight='bold')
     axes[1].set_ylabel('Perplexity (Lower is Better)', fontsize=13)
 
-    # 图 3：Pareto 权衡前沿散点图（增强悬停交互版）
+    # 图 3：Pareto 权衡前沿散点图
     markers = ['o', 's', '^', 'D', 'v', 'p', '*']
     colors = sns.color_palette("deep", len(algorithms))
     
-    # 存储所有散点图的句柄，用于后续的悬停交互
     scatter_collections = {}
-    
     for idx, algo in enumerate(algorithms):
-        # 引入 Jitter（抖动扰动）拉开重叠的点阵
         ppl_jitter = df[f'PPL_{algo}'] + np.random.normal(0, 0.4, size=len(df))
         z_jitter = df[f'Z_Score_{algo}'] + np.random.normal(0, 0.1, size=len(df))
         
-        # 保存原始数据用于悬停显示
-        scatter = axes[2].scatter(ppl_jitter, z_jitter, 
-                                  alpha=0.4,  # 降低透明度
-                                  label=algo, 
-                                  s=25,       # 显著缩小点的大小，避免抱团
-                                  marker=markers[idx % len(markers)], 
-                                  color=colors[idx], 
-                                  edgecolors='white',
-                                  linewidth=0.3,
-                                  picker=True,  # 启用拾取功能
-                                  pickradius=5) # 拾取半径
-        
-        scatter_collections[algo] = {
-            'scatter': scatter,
-            'color': colors[idx],
-            'marker': markers[idx % len(markers)]
-        }
+        scatter = axes[2].scatter(ppl_jitter, z_jitter, alpha=0.4, label=algo, s=25, 
+                                  marker=markers[idx % len(markers)], color=colors[idx], 
+                                  edgecolors='white', linewidth=0.3, picker=True, pickradius=5)
+        scatter_collections[algo] = {'scatter': scatter, 'color': colors[idx], 'marker': markers[idx % len(markers)]}
     
     axes[2].axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2)
     axes[2].set_title('Trade-off: Quality vs. Detectability\n(Hover mouse over points to see details)', 
@@ -219,72 +229,45 @@ def generate_benchmark_plots(csv_path):
     axes[2].set_xlabel('Perplexity (Lower is better)', fontsize=13)
     axes[2].set_ylabel('Z-Score (Higher is better)', fontsize=13)
     
-    # 强制限制 XY 轴视野，切掉极端离群点
     axes[2].set_xlim(0, 50) 
     axes[2].set_ylim(-5, 8) 
-    
     axes[2].legend(title="Algorithm", loc="lower right", fontsize=10)
 
-    # ========== 添加悬停交互功能 ==========
     cursor = mplcursors.cursor(axes[2].collections, hover=True)
-    
     @cursor.connect("add")
     def on_add(sel):
-        # 获取被选中的点
         artist = sel.artist
         index = sel.index
-        
-        # 高亮显示选中的点
-        # 重置所有点的样式
         for algo_name, data in scatter_collections.items():
-            scatter = data['scatter']
-            # 恢复所有点的原始样式
-            scatter.set_alpha(0.4)
-            scatter.set_sizes([25] * len(scatter.get_offsets()))
-            scatter.set_edgecolors('white')
-            scatter.set_linewidth(0.3)
-        
-        # 高亮选中的点
+            sc = data['scatter']
+            sc.set_alpha(0.4)
+            sc.set_sizes([25] * len(sc.get_offsets()))
+            sc.set_edgecolors('white')
+            sc.set_linewidth(0.3)
         artist.set_alpha(0.9)
         artist.set_sizes([80] * len(artist.get_offsets()))
         artist.set_edgecolors('black')
         artist.set_linewidth(1.5)
-        
-        # 找到当前选中的是哪个算法
-        for algo_name, data in scatter_collections.items():
-            if data['scatter'] == artist:
-                current_algo = algo_name
-                break
-        else:
-            current_algo = "Unknown"
-        
-        # 获取数据点的值
-        x_data = artist.get_offsets()[index][0]
-        y_data = artist.get_offsets()[index][1]
-        
-        # 设置悬停提示文本
+        current_algo = next((name for name, data in scatter_collections.items() if data['scatter'] == artist), "Unknown")
+        x_data, y_data = artist.get_offsets()[index]
         sel.annotation.set_text(f'Algorithm: {current_algo}\nPPL: {x_data:.2f}\nZ-Score: {y_data:.2f}')
         sel.annotation.get_bbox_patch().set(fc="white", alpha=0.8, edgecolor=colors[list(scatter_collections.keys()).index(current_algo)], linewidth=2)
         sel.annotation.set_fontsize(10)
     
     @cursor.connect("remove")
     def on_remove(sel):
-        # 鼠标移出时，恢复所有点的原始样式
         for algo_name, data in scatter_collections.items():
-            scatter = data['scatter']
-            scatter.set_alpha(0.4)
-            scatter.set_sizes([25] * len(scatter.get_offsets()))
-            scatter.set_edgecolors('white')
-            scatter.set_linewidth(0.3)
-        
-        # 强制刷新图形
+            sc = data['scatter']
+            sc.set_alpha(0.4)
+            sc.set_sizes([25] * len(sc.get_offsets()))
+            sc.set_edgecolors('white')
+            sc.set_linewidth(0.3)
         plt.draw()
     
     plt.tight_layout()
     output_filename = "benchmark_comparison_plot.png"
     plt.savefig(output_filename, dpi=300, bbox_inches='tight')
     print(f"高级对比图表已成功保存至: {output_filename}")
-
     plt.show()
 
 
@@ -295,16 +278,15 @@ if __name__ == "__main__":
         "Alpaca_Chat": {"path": "tatsu-lab/alpaca", "name": "default", "text_col": "instruction"}
     }
 
+    # 注册所有防线算法（新增 DiPmark 分布保持水印）
     algorithms = {
         "Natural": None,
         "KGW": LogitsProcessorList([KGWLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),
-        "SWEET": LogitsProcessorList(
-            [SWEETLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE, entropy_threshold=1.5)]),
+        "SWEET": LogitsProcessorList([SWEETLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE, entropy_threshold=1.5)]),
+        "DiPmark": LogitsProcessorList([DiPmarkLogitsProcessor(model.config.vocab_size, alpha=0.6)]),
         "Unigram": LogitsProcessorList([UnigramLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),
         "SemStamp": LogitsProcessorList([SemStampLogitsProcessor(tokenizer)])
     }
-    # 检测方法映射：Unigram 使用固定绿名单检测，其余使用 KGW 式检测
-    # detect_methods = {"Unigram": "unigram"}
 
     results = []
     print(f"\n开始【多数据集】联合横向评估...")
@@ -319,10 +301,9 @@ if __name__ == "__main__":
             continue
 
         sample_count = 0
-        # 修复 tqdm 逻辑：绑定到真正生成的样本计数上
         pbar = tqdm(total=TEST_SAMPLE_SIZE, desc=f"生成 {ds_name} 样本")
         
-        for data in dataset: # 注意：这里去掉了 dataset 外面的 tqdm()
+        for data in dataset:
             if sample_count >= TEST_SAMPLE_SIZE:
                 break
 
@@ -344,7 +325,6 @@ if __name__ == "__main__":
                 outputs = model.generate(**generate_kwargs)
                 text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-                # method = detect_methods.get(algo_name, "kgw")
                 row_result[f"Z_Score_{algo_name}"] = round(detect_watermark(text, algo_name,tokenizer, model.config.vocab_size), 3)
                 row_result[f"PPL_{algo_name}"] = round(calculate_ppl(text, model, tokenizer, device), 3)
                 if algo_name != "Natural":
@@ -352,9 +332,9 @@ if __name__ == "__main__":
 
             results.append(row_result)
             sample_count += 1
-            pbar.update(1) # 每成功生成并评估一条，进度条走 1 步
+            pbar.update(1) 
             
-        pbar.close() # 当前数据集完成，关闭进度条
+        pbar.close() 
 
     df = pd.DataFrame(results)
     df.to_csv(CSV_FILENAME, index=False)

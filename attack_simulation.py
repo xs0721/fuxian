@@ -5,8 +5,13 @@ import torch
 import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, MarianTokenizer, MarianMTModel
 import os
+import warnings
+
+# 忽略翻译模型加载时的一些常规警告，保持终端整洁
+warnings.filterwarnings("ignore")
+
 # 获取当前脚本的绝对路径，并强制切换工作目录到这里
 current_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_dir)
@@ -28,6 +33,16 @@ print(f"[{device.upper()}] 部署重写攻击大模型: {ATTACKER_MODEL}...")
 attacker_tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR)
 attacker_model = AutoModelForSeq2SeqLM.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR).to(device)
 
+print(f"[{device.upper()}] 部署 CWRA 跨语言回译攻击引擎 (En -> Fr -> En)...")
+# 显式使用 Marian 专属类，绕过 AutoTokenizer 的映射 Bug
+en_fr_model_name = "Helsinki-NLP/opus-mt-en-fr"
+en_fr_tokenizer = MarianTokenizer.from_pretrained(en_fr_model_name, cache_dir=CACHE_DIR)
+en_fr_model = MarianMTModel.from_pretrained(en_fr_model_name, cache_dir=CACHE_DIR).to(device)
+
+fr_en_model_name = "Helsinki-NLP/opus-mt-fr-en"
+fr_en_tokenizer = MarianTokenizer.from_pretrained(fr_en_model_name, cache_dir=CACHE_DIR)
+fr_en_model = MarianMTModel.from_pretrained(fr_en_model_name, cache_dir=CACHE_DIR).to(device)
+
 # ================= 2. 攻击引擎与检测器定义 =================
 def simulate_word_drop(text, drop_ratio):
     """攻击模式 A：随机删词（破坏局部连续性）"""
@@ -45,6 +60,32 @@ def llm_paraphrase_attack(text):
     with torch.no_grad():
         outputs = attacker_model.generate(input_ids, max_length=512, num_beams=4, early_stopping=True)
     return attacker_tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+def cwra_translation_attack(text):
+    """
+    攻击模式 C：跨语言多跳洗稿 (CWRA)
+    通过底层模型实现 En -> Fr -> En，在保持人类可读语义的同时制造巨大的向量漂移。
+    """
+    if not isinstance(text, str) or len(text.strip()) == 0: 
+        return text
+    
+    try:
+        # 第一跳：英文翻译为法文
+        inputs_en = en_fr_tokenizer(text, return_tensors="pt", max_length=512, truncation=True).to(device)
+        with torch.no_grad():
+            outputs_fr = en_fr_model.generate(**inputs_en, max_length=512)
+        fr_text = en_fr_tokenizer.decode(outputs_fr[0], skip_special_tokens=True)
+        
+        # 第二跳：法文回译为英文
+        inputs_fr = fr_en_tokenizer(fr_text, return_tensors="pt", max_length=512, truncation=True).to(device)
+        with torch.no_grad():
+            outputs_en = fr_en_model.generate(**inputs_fr, max_length=512)
+        en_text = fr_en_tokenizer.decode(outputs_en[0], skip_special_tokens=True)
+        
+        return en_text
+    except Exception as e:
+        print(f"\n[CWRA 攻击跳过] 文本处理异常: {e}")
+        return text
 
 def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_key=15485863):
     """
@@ -113,12 +154,11 @@ results_history_drop = {algo: [] for algo in algorithms}
 for ratio in attack_ratios:
     print(f"  > 攻击强度 {int(ratio*100)}% ...")
     for algo in algorithms:
-        # 注意这里：直接传入 algo 名字即可，不要再用 method 字典映射了
         current_z_scores = [detect_watermark(simulate_word_drop(text, ratio), algo, detector_tokenizer, vocab_size) 
                             for text in df[f"Text_{algo}"]]
         results_history_drop[algo].append(sum(current_z_scores) / len(current_z_scores))
 
-# 绘制图 1 (带有自适应 Y 轴修复)
+# 绘制图 1
 plt.figure(figsize=(9, 6))
 markers = ['o', 's', '^', 'D', 'v']
 for i, algo in enumerate(algorithms):
@@ -127,7 +167,6 @@ plt.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshol
 plt.title('Attack Test 1: Robustness under Word Drop', fontsize=15, pad=15, fontweight='bold')
 plt.xlabel('Modification Ratio (%)', fontsize=13); plt.ylabel('Average Z-Score', fontsize=13)
 
-# 修复后的 Y 轴自适应逻辑
 all_drop_scores = [score for scores in results_history_drop.values() for score in scores]
 plt.ylim(min(min(all_drop_scores) - 0.5, -0.5), max(max(all_drop_scores) + 0.5, 4.5))
 
@@ -136,46 +175,57 @@ plt.savefig("attack_1_word_drop.png", dpi=300, bbox_inches='tight')
 print("  >>> 图表 1 已保存: attack_1_word_drop.png")
 plt.show()
 
-# ================= 5. 测试二：LLM Rewrite 洗稿测试 =================
-print("\n[测试阶段 2/2] 开始 LLM Rewrite (大模型洗稿) 纵深打击...")
+# ================= 5. 测试二：高级洗稿与跨语言打击测试 =================
+print("\n[测试阶段 2/2] 开始 LLM Rewrite 与 CWRA 跨语言纵深打击...")
 # 为控制时间，随机抽取 20 条样本进行洗稿
 sample_df = df.dropna(subset=[f"Text_{algorithms[0]}"]).sample(n=min(20, len(df)), random_state=42)
-attack_results_llm = []
+attack_results_complex = []
 
-for idx, row in tqdm(sample_df.iterrows(), total=len(sample_df), desc="洗稿进度"):
+for idx, row in tqdm(sample_df.iterrows(), total=len(sample_df), desc="高级攻击进度"):
     for algo in algorithms:
-        # ⚠️ 这里直接删掉老旧的 method = ... 那一行
         original_text = row[f"Text_{algo}"]
-        attacked_text = llm_paraphrase_attack(original_text)
-
-        # ⚠️ 直接把 algo 传给检测器！
-        attack_results_llm.append({
+        
+        # 1. 记录攻击前状态
+        attack_results_complex.append({
             "Algorithm": algo, 
             "State": "Before Attack", 
             "Z_Score": detect_watermark(original_text, algo, detector_tokenizer, vocab_size)
         })
-        attack_results_llm.append({
+        
+        # 2. 实施 T5 洗稿攻击
+        t5_attacked_text = llm_paraphrase_attack(original_text)
+        attack_results_complex.append({
             "Algorithm": algo, 
             "State": "After T5 Rewrite", 
-            "Z_Score": detect_watermark(attacked_text, algo, detector_tokenizer, vocab_size)
+            "Z_Score": detect_watermark(t5_attacked_text, algo, detector_tokenizer, vocab_size)
+        })
+
+        # 3. 实施 CWRA 跨语言回译攻击
+        cwra_attacked_text = cwra_translation_attack(original_text)
+        attack_results_complex.append({
+            "Algorithm": algo, 
+            "State": "After CWRA (En-Fr-En)", 
+            "Z_Score": detect_watermark(cwra_attacked_text, algo, detector_tokenizer, vocab_size)
         })
 
 # 绘制图 2
-results_df = pd.DataFrame(attack_results_llm)
-plt.figure(figsize=(10, 6))
-sns.boxplot(x="Algorithm", y="Z_Score", hue="State", data=results_df, width=0.6, showfliers=False)
+results_df = pd.DataFrame(attack_results_complex)
+plt.figure(figsize=(12, 6)) # 稍微加宽一点以容纳第三个 Box
+sns.boxplot(x="Algorithm", y="Z_Score", hue="State", data=results_df, width=0.7, showfliers=False)
 sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=results_df, dodge=True, color='black', alpha=0.3)
 plt.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold (z=4.0)')
-plt.title('Attack Test 2: Vulnerability to LLM Paraphrasing', fontsize=15, pad=15, fontweight='bold')
+plt.title('Attack Test 2: Vulnerability to T5 Paraphrasing & CWRA', fontsize=15, pad=15, fontweight='bold')
 plt.ylabel('Z-Score', fontsize=13); plt.xlabel('Watermark Algorithm', fontsize=13)
 
 # 同样修复 Y 轴
-all_llm_scores = results_df["Z_Score"].tolist()
-plt.ylim(min(min(all_llm_scores) - 0.5, -0.5), max(max(all_llm_scores) + 0.5, 4.5))
+all_complex_scores = results_df["Z_Score"].tolist()
+plt.ylim(min(min(all_complex_scores) - 0.5, -0.5), max(max(all_complex_scores) + 0.5, 4.5))
 
-plt.legend(loc='upper right')
-plt.savefig("attack_2_llm_rewrite.png", dpi=300, bbox_inches='tight')
-print("  >>> 图表 2 已保存: attack_2_llm_rewrite.png")
+# 将图例移出主图防遮挡
+plt.legend(loc='upper left', bbox_to_anchor=(1.02, 1))
+plt.tight_layout()
+plt.savefig("attack_2_complex_rewrite.png", dpi=300, bbox_inches='tight')
+print("  >>> 图表 2 已保存: attack_2_complex_rewrite.png")
 plt.show()
 
 print("\n=== 所有对抗测试执行完毕！===")
