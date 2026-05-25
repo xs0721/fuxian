@@ -87,6 +87,7 @@ if not b4_df.empty:
     plt.tight_layout()
     plt.savefig("attack_7_b4_proxy_erasure.png", dpi=300, bbox_inches='tight')
     print(">>> 图表已保存: attack_7_b4_proxy_erasure.png")
+    plt.show()
     plt.close()
 
 print("=== 测试7完成 ===\n")

@@ -90,6 +90,197 @@ def character_removal_attack(text, drop_ratio):
     indices_to_drop = set(random.sample(range(len(chars)), num_drop))
     return "".join([c for i, c in enumerate(chars) if i not in indices_to_drop])
 
+# ---- 同义词替换 (来自 ASW markllm_editor.SynonymSubstitution) ----
+_SYNONYM_DICT = {
+    "good": ["great", "excellent", "fine", "superb", "nice", "decent", "wonderful"],
+    "bad": ["poor", "terrible", "awful", "dreadful", "lousy", "inferior", "unpleasant"],
+    "big": ["large", "huge", "massive", "enormous", "vast", "gigantic", "immense"],
+    "small": ["tiny", "little", "miniature", "compact", "petite", "slight", "modest"],
+    "happy": ["glad", "pleased", "cheerful", "joyful", "delighted", "content", "thrilled"],
+    "sad": ["unhappy", "sorrowful", "gloomy", "miserable", "depressed", "melancholy", "dismal"],
+    "fast": ["quick", "rapid", "swift", "speedy", "brisk", "accelerated", "hasty"],
+    "slow": ["sluggish", "gradual", "leisurely", "delayed", "prolonged", "tardy", "unhurried"],
+    "important": ["significant", "crucial", "vital", "essential", "critical", "paramount", "key"],
+    "difficult": ["hard", "challenging", "tough", "complex", "complicated", "arduous", "demanding"],
+    "easy": ["simple", "straightforward", "effortless", "uncomplicated", "facile", "light", "smooth"],
+    "strong": ["powerful", "robust", "sturdy", "forceful", "mighty", "vigorous", "potent"],
+    "weak": ["feeble", "fragile", "frail", "vulnerable", "brittle", "faint", "powerless"],
+    "old": ["ancient", "aged", "elderly", "antique", "vintage", "outdated", "mature"],
+    "new": ["fresh", "novel", "modern", "recent", "innovative", "original", "current"],
+    "beautiful": ["attractive", "pretty", "lovely", "gorgeous", "stunning", "elegant", "handsome"],
+    "ugly": ["unattractive", "hideous", "unpleasant", "unsightly", "grotesque", "plain", "homely"],
+    "rich": ["wealthy", "affluent", "prosperous", "opulent", "well-off", "abundant", "lavish"],
+    "poor": ["impoverished", "needy", "destitute", "underprivileged", "broke", "scarce", "meager"],
+    "smart": ["intelligent", "clever", "bright", "brilliant", "sharp", "wise", "astute"],
+    "stupid": ["foolish", "dumb", "ignorant", "silly", "unwise", "absurd", "ridiculous"],
+    "brave": ["courageous", "bold", "fearless", "valiant", "heroic", "daring", "gallant"],
+    "angry": ["furious", "irate", "enraged", "wrathful", "indignant", "annoyed", "irritated"],
+    "calm": ["peaceful", "serene", "tranquil", "placid", "relaxed", "composed", "still"],
+    "kind": ["benevolent", "compassionate", "gentle", "considerate", "generous", "caring", "sympathetic"],
+    "cruel": ["brutal", "ruthless", "merciless", "heartless", "savage", "vicious", "inhumane"],
+    "brave": ["courageous", "bold", "fearless", "valiant", "heroic", "daring", "gallant"],
+    "honest": ["truthful", "sincere", "frank", "candid", "genuine", "upright", "trustworthy"],
+    "brave": ["courageous", "bold", "fearless", "valiant", "heroic", "daring", "gallant"],
+    "interesting": ["fascinating", "engaging", "intriguing", "compelling", "captivating", "absorbing"],
+    "boring": ["dull", "tedious", "monotonous", "uninteresting", "dreary", "tiresome", "mundane"],
+    "happy": ["glad", "pleased", "cheerful", "joyful", "delighted", "content", "thrilled"],
+    "sad": ["unhappy", "sorrowful", "gloomy", "miserable", "depressed", "melancholy", "dismal"],
+    "certain": ["sure", "definite", "positive", "confident", "assured", "guaranteed", "inevitable"],
+    "possible": ["feasible", "achievable", "attainable", "viable", "practicable", "conceivable"],
+    "common": ["ordinary", "usual", "frequent", "typical", "regular", "standard", "everyday"],
+    "rare": ["uncommon", "scarce", "unusual", "infrequent", "exceptional", "unique", "extraordinary"],
+    "careful": ["cautious", "prudent", "vigilant", "wary", "alert", "attentive", "meticulous"],
+    "careless": ["reckless", "negligent", "heedless", "rash", "inattentive", "thoughtless", "sloppy"],
+    "clear": ["obvious", "evident", "plain", "apparent", "transparent", "distinct", "lucid"],
+    "confused": ["bewildered", "perplexed", "puzzled", "baffled", "muddled", "disoriented", "dazed"],
+    "deep": ["profound", "abyssal", "bottomless", "fathomless", "intense", "serious", "extreme"],
+    "shallow": ["superficial", "surface-level", "skin-deep", "cursory", "lightweight", "trivial"],
+    "early": ["premature", "initial", "beginning", "first", "advance", "prior", "preceding"],
+    "late": ["tardy", "delayed", "overdue", "belated", "behind", "postponed", "deferred"],
+    "empty": ["vacant", "hollow", "blank", "void", "bare", "deserted", "unoccupied"],
+    "full": ["filled", "packed", "crowded", "stuffed", "loaded", "saturated", "complete"],
+    "gentle": ["mild", "soft", "tender", "light", "moderate", "delicate", "subtle"],
+    "rough": ["coarse", "uneven", "rugged", "harsh", "abrasive", "bumpy", "crude"],
+    "healthy": ["well", "fit", "robust", "sound", "wholesome", "vigorous", "hearty"],
+    "sick": ["ill", "unwell", "ailing", "diseased", "suffering", "indisposed", "unhealthy"],
+    "narrow": ["tight", "slim", "slender", "restricted", "limited", "confined", "thin"],
+    "wide": ["broad", "extensive", "spacious", "vast", "expansive", "sweeping", "ample"],
+    "noisy": ["loud", "boisterous", "clamorous", "rowdy", "vociferous", "raucous", "deafening"],
+    "quiet": ["silent", "still", "hushed", "peaceful", "muted", "subdued", "tranquil"],
+    "polite": ["courteous", "respectful", "civil", "gracious", "well-mannered", "diplomatic", "refined"],
+    "rude": ["impolite", "discourteous", "disrespectful", "insolent", "abrupt", "crass", "boorish"],
+    "safe": ["secure", "protected", "shielded", "guarded", "harmless", "reliable", "dependable"],
+    "dangerous": ["risky", "hazardous", "perilous", "unsafe", "treacherous", "threatening", "precarious"],
+    "same": ["identical", "equivalent", "alike", "uniform", "indistinguishable", "matching"],
+    "different": ["distinct", "diverse", "various", "disparate", "dissimilar", "contrasting", "varied"],
+    "true": ["accurate", "correct", "valid", "genuine", "authentic", "factual", "legitimate"],
+    "false": ["incorrect", "wrong", "untrue", "erroneous", "fake", "bogus", "invalid"],
+    "young": ["youthful", "juvenile", "adolescent", "immature", "fresh", "green", "budding"],
+    "create": ["generate", "produce", "make", "build", "construct", "develop", "establish"],
+    "destroy": ["ruin", "demolish", "wreck", "annihilate", "devastate", "obliterate", "shatter"],
+    "improve": ["enhance", "upgrade", "refine", "boost", "advance", "optimize", "strengthen"],
+    "reduce": ["decrease", "diminish", "lower", "cut", "lessen", "shrink", "curtail"],
+    "increase": ["raise", "elevate", "expand", "grow", "augment", "amplify", "escalate"],
+    "begin": ["start", "commence", "initiate", "launch", "inaugurate", "embark", "open"],
+    "finish": ["complete", "conclude", "end", "finalize", "terminate", "accomplish", "wrap up"],
+    "help": ["assist", "aid", "support", "facilitate", "benefit", "serve", "back"],
+    "stop": ["halt", "cease", "quit", "discontinue", "suspend", "terminate", "pause"],
+    "show": ["display", "exhibit", "demonstrate", "reveal", "present", "indicate", "manifest"],
+    "hide": ["conceal", "cover", "mask", "disguise", "obscure", "camouflage", "veil"],
+    "think": ["believe", "consider", "suppose", "assume", "reckon", "ponder", "reflect"],
+    "know": ["understand", "comprehend", "grasp", "recognize", "realize", "perceive", "appreciate"],
+    "want": ["desire", "wish", "crave", "long for", "yearn", "covet", "seek"],
+    "need": ["require", "necessitate", "demand", "call for", "entail", "warrant", "mandate"],
+    "give": ["provide", "offer", "supply", "deliver", "grant", "bestow", "donate"],
+    "take": ["seize", "grab", "acquire", "obtain", "capture", "collect", "extract"],
+    "find": ["discover", "locate", "detect", "uncover", "identify", "spot", "trace"],
+    "lose": ["misplace", "forfeit", "surrender", "yield", "relinquish", "drop", "suffer loss"],
+    "change": ["alter", "modify", "transform", "convert", "adjust", "revise", "reshape"],
+    "keep": ["retain", "maintain", "preserve", "hold", "guard", "safeguard", "sustain"],
+    "believe": ["trust", "accept", "credit", "deem", "hold", "maintain", "presume"],
+    "explain": ["clarify", "elucidate", "describe", "illustrate", "interpret", "define", "expound"],
+    "understand": ["comprehend", "grasp", "apprehend", "fathom", "discern", "perceive"],
+    "remember": ["recall", "recollect", "reminisce", "retrieve", "recognize", "bear in mind"],
+    "forget": ["overlook", "neglect", "omit", "disregard", "ignore", "abandon", "dismiss"],
+    "allow": ["permit", "authorize", "enable", "let", "sanction", "approve", "empower"],
+    "prevent": ["stop", "block", "hinder", "impede", "prohibit", "restrict", "thwart"],
+    "include": ["contain", "incorporate", "encompass", "comprise", "cover", "embrace", "involve"],
+    "exclude": ["omit", "eliminate", "remove", "reject", "bar", "ban", "expel"],
+    "achieve": ["attain", "accomplish", "realize", "reach", "fulfill", "complete", "execute"],
+    "fail": ["flop", "collapse", "founder", "miscarry", "fall short", "come up short"],
+    "agree": ["concur", "consent", "accede", "approve", "endorse", "align", "harmonize"],
+    "disagree": ["differ", "dissent", "dispute", "object", "oppose", "contradict", "conflict"],
+    "love": ["adore", "cherish", "treasure", "worship", "devote", "revere", "idolize"],
+    "hate": ["detest", "despise", "loathe", "abhor", "resent", "scorn", "disdain"],
+    "speak": ["talk", "say", "utter", "articulate", "express", "voice", "declare"],
+    "write": ["compose", "draft", "pen", "jot", "record", "scribble", "inscribe"],
+    "read": ["peruse", "scan", "study", "browse", "skim", "review", "examine"],
+    "learn": ["study", "acquire", "master", "grasp", "absorb", "assimilate", "educate"],
+    "teach": ["instruct", "educate", "train", "guide", "coach", "mentor", "enlighten"],
+    "ask": ["inquire", "question", "query", "request", "solicit", "interrogate", "probe"],
+    "answer": ["reply", "respond", "retort", "rejoin", "acknowledge", "address", "counter"],
+    "buy": ["purchase", "acquire", "procure", "obtain", "shop for", "invest in", "secure"],
+    "sell": ["vend", "market", "trade", "peddle", "hawk", "auction", "retail"],
+    "build": ["construct", "erect", "assemble", "fabricate", "forge", "raise", "establish"],
+    "break": ["shatter", "fracture", "crack", "smash", "split", "crush", "rupture"],
+    "open": ["unlock", "unseal", "unwrap", "unfold", "reveal", "expose", "access"],
+    "close": ["shut", "seal", "lock", "fasten", "secure", "conclude", "end"],
+    "win": ["triumph", "prevail", "succeed", "conquer", "vanquish", "overcome", "dominate"],
+    "lose": ["suffer defeat", "fall short", "be beaten", "yield", "capitulate", "succumb"],
+    "lead": ["guide", "direct", "steer", "pilot", "command", "head", "govern"],
+    "follow": ["pursue", "trail", "shadow", "track", "trace", "observe", "obey"],
+    "grow": ["expand", "develop", "flourish", "thrive", "prosper", "mature", "bloom"],
+    "die": ["perish", "expire", "pass away", "decease", "depart", "fade", "vanish"],
+    "like": ["enjoy", "appreciate", "fancy", "favor", "relish", "admire", "prefer"],
+    "fear": ["dread", "terror", "anxiety", "worry", "panic", "alarm", "fright"],
+}
+
+def synonym_substitution_attack(text, ratio=0.3):
+    """同义词替换攻击 (来自 ASW markllm_editor.SynonymSubstitution).
+    ratio: 替换比例, 0.0~1.0"""
+    if not isinstance(text, str) or not text.strip():
+        return text
+    words = text.split()
+    num_words = len(words)
+    if num_words == 0:
+        return text
+
+    # 找出可替换的词索引
+    replaceable = []
+    word_lower_map = {}
+    for i, w in enumerate(words):
+        clean = w.strip(".,;:!?\"'()[]{}").lower()
+        if clean in _SYNONYM_DICT:
+            replaceable.append(i)
+            word_lower_map[i] = clean
+
+    if not replaceable:
+        return text
+
+    num_to_replace = max(1, int(min(ratio, len(replaceable) / num_words) * num_words))
+    num_to_replace = min(num_to_replace, len(replaceable))
+    indices = random.sample(replaceable, num_to_replace)
+
+    new_words = words[:]
+    for i in indices:
+        clean_lower = word_lower_map[i]
+        synonyms = _SYNONYM_DICT[clean_lower]
+        replacement = random.choice(synonyms)
+        # 保留原词的大写/首字母大写
+        orig = words[i]
+        if orig.isupper():
+            replacement = replacement.upper()
+        elif orig[0].isupper():
+            replacement = replacement[0].upper() + replacement[1:]
+        new_words[i] = replacement
+
+    return " ".join(new_words)
+
+# ---- 复制粘贴攻击 (来自 ASW markllm_editor.CopyPasteAttack) ----
+def copy_paste_attack(text, reference_text=None, ratio=0.2):
+    """从无 watermark 的参考文本中随机复制句子替换 watermark 文本中的句子.
+    (来自 ASW markllm_editor.CopyPasteAttack)"""
+    if not isinstance(text, str) or not text.strip():
+        return text
+    if not reference_text:
+        return text
+
+    wm_sents = re.split(r'(?<=[.!?])\s+', text)
+    ref_sents = re.split(r'(?<=[.!?])\s+', reference_text)
+
+    if len(wm_sents) <= 1 or len(ref_sents) == 0:
+        return text
+
+    change_count = max(1, int(len(wm_sents) * ratio))
+    change_count = min(change_count, len(ref_sents))
+    replace_ids = random.sample(range(len(wm_sents)), min(change_count, len(wm_sents)))
+    replace_texts = random.sample(ref_sents, change_count)
+
+    for idx, rep_sent in zip(replace_ids, replace_texts):
+        wm_sents[idx] = rep_sent
+
+    return " ".join(wm_sents)
+
 def llm_paraphrase_attack(text):
     load_attacker()
     if not isinstance(text, str) or len(text.strip()) == 0: return text
