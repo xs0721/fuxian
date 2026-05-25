@@ -1,4 +1,13 @@
 """各测试共用的配置、模型和工具函数"""
+import sys
+import os
+
+# 强制 UTF-8 编码, 解决 Windows 终端 GBK 显示乱码问题
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 import pandas as pd
 import random
 import math
@@ -11,7 +20,6 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, MarianTokenizer, MarianMTModel, AutoModelForCausalLM, LogitsProcessor, LogitsProcessorList, GenerationConfig
 from transformers.cache_utils import DynamicCache
 from copy import deepcopy
-import os
 import warnings
 import re
 import glob
@@ -335,47 +343,104 @@ def watermark_stealing_attack(text, algo_name, attack_type, tokenizer, vocab_siz
             tampered_tokens.append(curr)
     return tokenizer.decode(tampered_tokens, skip_special_tokens=True)
 
-# ================= SIRA 组件 =================
+# ================= SIRA 组件 (对齐 Self-information-Rewrite-Attack 三阶段流水线) =================
 def calculate_token_self_information(text, model, tokenizer, device):
+    """Stage 2 核心: 计算每个 token 的自信息 (surprisal). 参考 SIRA SelfInformationCalculator"""
     inputs = tokenizer(text, return_tensors="pt").to(device)
     input_ids = inputs.input_ids
     if input_ids.shape[1] <= 1: return [], []
     with torch.no_grad(): outputs = model(input_ids)
     logits = outputs.logits[0, :-1, :]
     target_ids = input_ids[0, 1:]
-    probs = F.softmax(logits, dim=-1)
+    probs = torch.softmax(logits, dim=-1)  # 对齐参考: 使用自然对数
     token_probs = probs.gather(1, target_ids.unsqueeze(1)).squeeze(-1)
-    self_info = -torch.log2(token_probs + 1e-10)
+    self_info = -torch.log(token_probs + 1e-10)
     tokens = tokenizer.convert_ids_to_tokens(target_ids)
     return tokens, self_info.cpu().numpy()
 
-def sira_masking(text, model, tokenizer, mask_ratio=0.2, device="cuda"):
+def sira_generate_reference(text):
+    """Stage 1: 改写水印文本生成"参考文本".
+    对齐 SIRA attack_onestep.fill_parapharse_prompt.
+    使用 T5 的 paraphrase 前缀作为轻量替代."""
+    load_attacker()
+    if not isinstance(text, str) or len(text.strip()) == 0:
+        return text
+    input_ids = attacker_tokenizer("paraphrase: " + text, return_tensors="pt",
+                                    max_length=512, truncation=True).input_ids.to(device)
+    with torch.no_grad():
+        outputs = attacker_model.generate(input_ids, max_length=512, num_beams=4, early_stopping=True)
+    return attacker_tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+def sira_masking(text, model, tokenizer, threshold_percentile=30, device="cuda"):
+    """Stage 2: 自信息驱动的空白化.
+    对齐 SIRA SelfInformationCalculator.transform_tokens:
+    - 低自信息 token (≤ P_threshold) → 保留, 作为上下文线索
+    - 高自信息 token (> P_threshold) → 替换为 <extra_id_N> 等待填充
+    连续低自信息块 → 合并, 连续高自信息块 → 合并为一个空白位
+    threshold_percentile: 默认 30, 即保留自信息最低的 30% token"""
     tokens, self_info_scores = calculate_token_self_information(text, model, tokenizer, device)
-    if not tokens or len(tokens) < 5: return text
-    num_to_mask = max(1, int(len(tokens) * mask_ratio))
-    highest_entropy_indices = np.argsort(self_info_scores)[-num_to_mask:]
+    if not tokens or len(tokens) < 5:
+        return text
+
+    cutoff = np.percentile(self_info_scores, threshold_percentile)
+    # low_si = 自信息 <= cutoff (保留), high_si = 自信息 > cutoff (遮蔽)
+    mask_flags = self_info_scores > cutoff
+
     masked_tokens = []
     mask_count = 0
     i = 0
     while i < len(tokens):
-        if i in highest_entropy_indices:
+        if mask_flags[i]:
+            # 高自信息块: 合并连续高自信息 token 为一个空白位
             masked_tokens.append(f"<extra_id_{mask_count}>")
             mask_count += 1
-            while i < len(tokens) and i in highest_entropy_indices: i += 1
-            continue
+            while i < len(tokens) and mask_flags[i]:
+                i += 1
         else:
-            clean_token = tokens[i].replace('Ġ', ' ').replace('Ċ', '\n')
-            masked_tokens.append(clean_token)
+            # 低自信息块: 保留作为上下文 (保留原始 token, 不 strip Ġ/Ċ)
+            masked_tokens.append(tokens[i])
             i += 1
-    return "".join(masked_tokens).strip()
 
-def sira_t5_infilling(masked_text):
+    blank_text = "".join(masked_tokens).strip()
+    return blank_text
+
+def sira_attack_prompt(reference_text, blank_text):
+    """Stage 3 攻击 prompt: 参考文本 + 空白化文本 → 引导 LLM 填充.
+    对齐 SIRA fill_attack_prompt"""
+    prompt = (
+        "You will be shown one reference paragraph and one incomplete paragraph.\n"
+        "Your task is to write a complete paragraph using incomplete paragraph.\n"
+        "The complete paragraph should have similar length with reference paragraph.\n"
+        "You need to include all the information in the reference.\n"
+        "But do not take the expression and words in the reference paragraph.\n"
+        "You should only answer the complete paragraph.\n"
+        f"reference: {reference_text}\n"
+        f"incomplete paragraph: {blank_text}\n"
+    )
+    return prompt
+
+def sira_t5_infilling(masked_text, reference_text=None):
+    """Stage 3: T5 文本填充.
+    如果有 reference_text, 将其作为上下文拼接到输入中辅助 T5 填充空白位;
+    否则回退到直接填充空白位."""
     load_attacker()
-    if "<extra_id_" not in masked_text: return masked_text
-    inputs = attacker_tokenizer(masked_text, return_tensors="pt", max_length=512, truncation=True).to(device)
+    if "<extra_id_" not in masked_text:
+        return masked_text
+
+    if reference_text:
+        # T5 seq2seq 友好格式: 参考文本作为额外上下文
+        input_str = f"paraphrase: {reference_text} context: {masked_text}"
+    else:
+        input_str = masked_text
+
+    inputs = attacker_tokenizer(input_str, return_tensors="pt",
+                                 max_length=512, truncation=True).to(device)
     with torch.no_grad():
-        outputs = attacker_model.generate(**inputs, max_length=512, num_beams=4, temperature=0.8, do_sample=True, early_stopping=True)
+        outputs = attacker_model.generate(**inputs, max_length=512, num_beams=4,
+                                          temperature=0.8, do_sample=True, early_stopping=True)
     filled_content = attacker_tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # 从 T5 输出中提取并替换 <extra_id_N> 占位符
     final_text = masked_text
     parts = [p.strip() for p in filled_content.split("<extra_id_") if p.strip()]
     for i, part in enumerate(parts):

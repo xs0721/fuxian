@@ -11,6 +11,7 @@ import os
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("NO_PROXY", "*")
+os.environ.setdefault("PYTHONIOENCODING", "utf-8")
 os.environ.setdefault("PYTHONNOUSERSITE", "1")
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

@@ -7,6 +7,7 @@ setlocal
 set HF_HUB_OFFLINE=1
 set TRANSFORMERS_OFFLINE=1
 set NO_PROXY=*
+set PYTHONIOENCODING=utf-8
 set PYTHONNOUSERSITE=1
 
 set PYTHON=C:\Users\20747\.conda\envs\watermark\python.exe
