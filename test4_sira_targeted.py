@@ -1,9 +1,7 @@
 """测试4: SIRA 高熵靶向重写降维打击"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 4/7] SIRA 高熵靶向重写降维打击")
-print("="*60)
+print_test_header("SIRA 高熵靶向重写降维打击")
 
 load_attacker()  # SIRA 需要 T5 做文本填充
 
@@ -54,5 +52,6 @@ table4.auto_set_column_width(col=list(range(len(table4_data.columns))))
 plt.tight_layout()
 plt.savefig("attack_4_sira_targeted.png", dpi=300, bbox_inches='tight')
 print(">>> 图表已保存: attack_4_sira_targeted.png")
+plt.show()
 plt.close()
 print("=== 测试4完成 ===\n")

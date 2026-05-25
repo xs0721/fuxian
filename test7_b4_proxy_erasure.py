@@ -1,9 +1,7 @@
 """测试7: B4 黑盒代理模型盲擦除攻击 (NAACL 2025)"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 7/7] B4 黑盒代理模型盲擦除攻击 (NAACL 2025)")
-print("="*60)
+print_test_header("B4 黑盒代理模型盲擦除攻击 (NAACL 2025)")
 
 # 卸载 OPT-125m 模型权重释放 VRAM（B4 仅需 tokenizer）
 if target_model is not None:

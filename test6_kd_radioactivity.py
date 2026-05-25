@@ -1,9 +1,7 @@
 """测试6: 知识蒸馏(KD)的水印放射性与 WN 中和攻击"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 6/7] 知识蒸馏(KD)的水印放射性与 WN 中和攻击")
-print("="*60)
+print_test_header("知识蒸馏(KD)的水印放射性与 WN 中和攻击")
 
 def get_kgw_green_mask(prefix_token, vocab_size, gamma=0.5, secret_key=15485863):
     torch.manual_seed(secret_key * prefix_token)
@@ -126,5 +124,6 @@ table6.scale(1, 2.5)
 plt.tight_layout()
 plt.savefig("attack_6_kd_radioactivity_wn.png", dpi=300, bbox_inches='tight')
 print(">>> 图表已保存: attack_6_kd_radioactivity_wn.png")
+plt.show()
 plt.close()
 print("=== 测试6完成 ===\n")

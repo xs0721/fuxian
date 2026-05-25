@@ -1,9 +1,7 @@
 """测试2: LLM Rewrite 与 CWRA 跨语言纵深打击"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 2/7] LLM Rewrite 与 CWRA 跨语言纵深打击")
-print("="*60)
+print_test_header("LLM Rewrite 与 CWRA 跨语言纵深打击")
 
 sample_df = df.dropna(subset=[f"Text_{algorithms[0]}"]).sample(n=min(20, len(df)), random_state=42)
 attack_results_complex = []
@@ -51,5 +49,6 @@ table2.scale(1, 2.5)
 plt.tight_layout()
 plt.savefig("attack_2_complex_rewrite.png", dpi=300, bbox_inches='tight')
 print(">>> 图表已保存: attack_2_complex_rewrite.png")
+plt.show()
 plt.close()
 print("=== 测试2完成 ===\n")

@@ -1,9 +1,7 @@
 """测试5: 哈希窗口大小 (h) 的多维博弈权衡分析"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 5/7] 哈希窗口大小 (h) 的多维博弈权衡分析")
-print("="*60)
+print_test_header("哈希窗口大小 (h) 的多维博弈权衡分析")
 
 def simulate_kgw_with_window(text, window_size, drop_ratio=0.0):
     tokens = detector_tokenizer.encode(text, add_special_tokens=False)
@@ -78,5 +76,6 @@ plt.title('Game Theory Trade-off: Window Size $h$ vs. Robustness & Security', fo
 fig5.tight_layout()
 plt.savefig("attack_5_window_tradeoff.png", dpi=300, bbox_inches='tight')
 print(">>> 图表已保存: attack_5_window_tradeoff.png")
+plt.show()
 plt.close()
 print("=== 测试5完成 ===\n")

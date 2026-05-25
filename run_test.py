@@ -23,6 +23,7 @@ TEST_SCRIPTS = {
     "5": "test5_window_tradeoff.py",
     "6": "test6_kd_radioactivity.py",
     "7": "test7_b4_proxy_erasure.py",
+    "8": "test8_adaptive_stealing.py",
 }
 
 def run_test(num):

@@ -14,6 +14,7 @@ from copy import deepcopy
 import os
 import warnings
 import re
+import glob
 
 warnings.filterwarnings("ignore")
 
@@ -410,5 +411,17 @@ def b4_proxy_erasure_attack(texts, paraphrase_model, amateur_model, origin_model
         all_attacked.extend(attacked)
 
     return all_attacked[0] if single_input else all_attacked
+
+# ================= 测试头自动生成 =================
+def print_test_header(description):
+    """从调用脚本文件名自动提取测试编号并统计总数，打印统一格式标题"""
+    import inspect as _inspect
+    caller_file = _inspect.currentframe().f_back.f_globals.get("__file__", "")
+    num = re.search(r"test(\d+)_", os.path.basename(caller_file))
+    num = num.group(1) if num else "?"
+    total = len(glob.glob(os.path.join(current_dir, "test[0-9]*_*.py")))
+    print(f"\n{'='*60}")
+    print(f"[测试 {num}/{total}] {description}")
+    print("="*60)
 
 print("\n>>> 公共模块加载完成 <<<")

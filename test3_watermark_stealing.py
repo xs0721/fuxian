@@ -1,9 +1,7 @@
 """测试3: 黑盒 API 逆向窃取与伪造攻击 (Watermark Stealing)"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 3/7] 黑盒 API 逆向窃取 (Watermark Stealing) 模拟")
-print("="*60)
+print_test_header("黑盒 API 逆向窃取 (Watermark Stealing) 模拟")
 
 ws_results = []
 sample_ws_df = df.head(20)
@@ -78,5 +76,6 @@ tab4.auto_set_font_size(False); tab4.set_fontsize(11); tab4.scale(1, 2.5)
 plt.tight_layout()
 plt.savefig("attack_3_watermark_stealing.png", dpi=300, bbox_inches='tight')
 print(">>> 图表已保存: attack_3_watermark_stealing.png")
+plt.show()
 plt.close()
 print("=== 测试3完成 ===\n")

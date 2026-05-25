@@ -1,9 +1,7 @@
 """测试1: 物理层扰动 (删词 & 删字符) 鲁棒性退化测试"""
 from test_common import *
 
-print("\n" + "="*60)
-print("[测试 1/7] 物理层扰动 (删词 & 删字符) 鲁棒性退化测试")
-print("="*60)
+print_test_header("物理层扰动 (删词 & 删字符) 鲁棒性退化测试")
 
 attack_ratios = [0.0, 0.1, 0.3, 0.5]
 results_word_drop = {algo: [] for algo in algorithms}
@@ -74,5 +72,6 @@ tab2.auto_set_font_size(False); tab2.set_fontsize(11); tab2.scale(1, 2.5)
 plt.tight_layout()
 plt.savefig("attack_1_physical_perturbation.png", dpi=300, bbox_inches='tight')
 print(">>> 图表已保存: attack_1_physical_perturbation.png")
+plt.show()
 plt.close()
 print("=== 测试1完成 ===\n")
