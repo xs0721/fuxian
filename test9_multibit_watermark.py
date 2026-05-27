@@ -1,10 +1,13 @@
 """测试9: 多比特水印 (Multi-bit) — Dual-Model Paraphraser + RewardModel 分类器
 
 对齐引用: multi-bit-text-watermark (Xu et al., 2024)
-硬件要求: ≥12 GB VRAM (推荐 ≥16 GB)
+策略: 模型0 GPU 4-bit + 模型1 CPU fp16 + 非mmap安全加载
 """
 import sys
 import os
+import struct
+import json
+import threading
 
 # ── UTF-8 编码 ────────────────────────────────────
 if sys.stdout.encoding != 'utf-8':
@@ -12,7 +15,7 @@ if sys.stdout.encoding != 'utf-8':
 if sys.stderr.encoding != 'utf-8':
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-# ── 网络配置 (绕过系统代理 + 国内镜像) ──────────────
+# ── 网络配置 ──────────────────────────────────────
 os.environ["HF_HUB_OFFLINE"] = "0"
 os.environ["TRANSFORMERS_OFFLINE"] = "0"
 if "HF_ENDPOINT" not in os.environ:
@@ -20,10 +23,116 @@ if "HF_ENDPOINT" not in os.environ:
 
 import requests as _requests
 _requests.Session.trust_env = False
-from huggingface_hub import get_session as _get_hf_session
-_get_hf_session().trust_env = False
+for _pv in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "ALL_PROXY", "all_proxy"):
+    os.environ.pop(_pv, None)
+os.environ.setdefault("NO_PROXY", "*")
+
+# ── 非mmap safetensors加载器 ─────────────────────
+# 必须在transformers导入前注入, Windows上绕过页面文件限制
+
+# dtype字符串→torch dtype (延迟导入, 避免模块级torch导入与pyarrow冲突)
+_DTYPE_STR_MAP = {
+    'F32': 'float32', 'F16': 'float16', 'BF16': 'bfloat16',
+    'I32': 'int32', 'I64': 'int64', 'I8': 'int8',
+    'U8': 'uint8', 'BOOL': 'bool',
+}
+
+
+def _str_to_dtype(dtype_str):
+    import torch as _t
+    return getattr(_t, _DTYPE_STR_MAP[dtype_str])
+
+
+class _FakeSlice:
+    """模拟 PySafeSlice: [...] 触发实际加载"""
+    __slots__ = ('_parent', '_name', '_dtype_str', '_shape')
+
+    def __init__(self, parent, name, dtype_str, shape):
+        self._parent = parent
+        self._name = name
+        self._dtype_str = dtype_str
+        self._shape = shape
+
+    def get_dtype(self):
+        return self._dtype_str
+
+    def get_shape(self):
+        return self._shape
+
+    def __getitem__(self, idx):
+        t = self._parent.get_tensor(self._name)
+        return t[idx]
+
+
+class _NonMmapFile:
+    """非mmap safetensors读取器 — 按需seek+read, 不触发Windows页面文件提交"""
+
+    def __init__(self, filepath):
+        self._fh = open(filepath, 'rb')
+        self._lock = threading.Lock()
+        header_len = struct.unpack('<Q', self._fh.read(8))[0]
+        self._metadata = json.loads(self._fh.read(header_len).decode())
+        self._tensor_meta = {k: v for k, v in self._metadata.items()
+                             if k != '__metadata__'}
+
+    def keys(self):
+        return self._tensor_meta.keys()
+
+    def get_tensor(self, name):
+        info = self._tensor_meta[name]
+        offsets = info['data_offsets']
+        size = offsets[1] - offsets[0]
+        with self._lock:
+            self._fh.seek(offsets[0])
+            raw = self._fh.read(size)
+        return __import__('torch').frombuffer(bytearray(raw), dtype=_str_to_dtype(info['dtype'])).clone().reshape(info['shape'])
+
+    def get_slice(self, name):
+        info = self._tensor_meta[name]
+        return _FakeSlice(self, name, info['dtype'], info['shape'])
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self._fh.close()
+        self._metadata = None
+        self._tensor_meta = None
+
+
+def _patch_safe_open():
+    """替换 safetensors.safe_open, CPU加载全部走非mmap路径(避免Windows页面文件限制)"""
+    import safetensors
+    _orig = safetensors.safe_open
+
+    def _patched(filename, framework='pt', device='cpu'):
+        if device == 'cpu' and framework == 'pt':
+            return _NonMmapFile(filename)
+        return _orig(filename, framework=framework, device=device)
+
+    safetensors.safe_open = _patched
+
+
+_patch_safe_open()  # 先替换 safetensors 层的 safe_open
+
+# ── 先解决pyarrow DLL冲突 (必须在pandas/datasets之前导入) ───
+import pyarrow
+
+# ── 路径 ──────────────────────────────────────────
+current_dir = os.path.dirname(os.path.abspath(__file__))
+MULTIBIT_PROJECT = os.path.join(
+    os.path.dirname(current_dir), "文章", "第四章引用", "引用的代码",
+    "multi-bit-text-watermark-master"
+)
+if MULTIBIT_PROJECT not in sys.path:
+    sys.path.insert(0, MULTIBIT_PROJECT)
 
 # ── 标准库导入 ────────────────────────────────────
+# 注意: utils必须在pandas/transformers前导入(触发pyarrow加载避免DLL冲突)
+import gen_utils
+import model_utils
+import utils
+
 import numpy as np
 import pandas as pd
 import random
@@ -36,42 +145,29 @@ from transformers import (AutoTokenizer, AutoModel, AutoModelForCausalLM,
 import warnings
 warnings.filterwarnings("ignore")
 
-# ── 路径 ──────────────────────────────────────────
-current_dir = os.path.dirname(os.path.abspath(__file__))
-MULTIBIT_PROJECT = os.path.join(
-    os.path.dirname(current_dir), "文章", "第四章引用", "引用的代码",
-    "multi-bit-text-watermark-master"
-)
-if MULTIBIT_PROJECT not in sys.path:
-    sys.path.insert(0, MULTIBIT_PROJECT)
-
-import gen_utils
-import model_utils
-import utils
+# transformers内部也引用safe_open, 需补丁
+import transformers.modeling_utils as _mu
+import transformers.core_model_loading as _cml
+_mu.safe_open = __import__('safetensors').safe_open
+_cml.safe_open = __import__('safetensors').safe_open
 
 # ── 全局配置 ──────────────────────────────────────
 device = "cuda" if torch.cuda.is_available() else "cpu"
 VRAM_GB = (torch.cuda.get_device_properties(0).total_memory / 1024**3
            if torch.cuda.is_available() else 0)
 
-# 显存策略: <12GB 无法运行, 12-20GB 用 4-bit, ≥20GB 用 bf16
-USE_4BIT = VRAM_GB < 20
-
-MODEL0_PATH = "xiaojunxu/WatermarkEncoder-Qwen2.5-7b-it-model0"
-MODEL1_PATH = "xiaojunxu/WatermarkEncoder-Qwen2.5-7b-it-model1"
+# 本地fp16模型 (预转换, 14GB代替28GB)
+FP16_DIR = os.path.join(os.path.expanduser("~"), ".cache", "watermark_fp16")
+MODEL0_PATH = os.path.join(FP16_DIR, "model0")
+MODEL1_PATH = os.path.join(FP16_DIR, "model1")
 RM_PATH = "xiaojunxu/WatermarkDecoder-Qwen2.5-1.5b"
 RM_HEADER_PATH = os.path.join(MULTIBIT_PROJECT, "ckpt", "WatermarkDecoder-v_head.pt")
 
 FULL_KEY = [1, 0, 1, 0, 1, 0, 1, 0] * 20  # 160-bit
 
-# 低显存时减小参数
-if VRAM_GB < 16:
-    MAX_INP_LEN, MAX_ANS_LEN, N_REPEAT = 192, 128, 1
-    MAX_SAMPLES = 1  # 只测 1 条
-else:
-    MAX_INP_LEN, MAX_ANS_LEN, N_REPEAT = 512, 512, 4
-    MAX_SAMPLES = 10
-
+# 低显存参数
+MAX_INP_LEN, MAX_ANS_LEN, N_REPEAT = 192, 64, 2
+MAX_SAMPLES = 1
 BATCH_SIZE = 1
 
 # ── 模型加载 ──────────────────────────────────────
@@ -84,15 +180,6 @@ _sim_tokenizer = None
 _sim_model = None
 
 
-def _build_4bit_config():
-    return BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16,
-        bnb_4bit_use_double_quant=True,
-    )
-
-
 def load_multibit_models():
     global _multibit_loaded, _tokenizer, _actor_model0, _actor_model1
     global _reward_model, _sim_tokenizer, _sim_model
@@ -100,39 +187,22 @@ def load_multibit_models():
     if _multibit_loaded:
         return
 
-    mode_str = "4-bit 量化" if USE_4BIT else "bf16 全精度"
-    print(f"[GPU: {VRAM_GB:.1f}GB] 模式: {mode_str}")
-    print("加载多比特水印编码器 (model0 + model1)...")
-
+    print(f"[GPU: {VRAM_GB:.1f}GB] 策略: model0 GPU 4-bit + model1 CPU fp16")
+    print("加载 tokenizer...")
     _tokenizer = utils.get_tokenizer('qwen2.5-7b-it')
     _tokenizer.padding_side = 'left'
 
-    if USE_4BIT:
-        bnb = _build_4bit_config()
-        _actor_model0 = AutoModelForCausalLM.from_pretrained(
-            MODEL0_PATH, quantization_config=bnb,
-            device_map="cuda:0", torch_dtype=torch.float16,
-        ).eval()
-        _actor_model1 = AutoModelForCausalLM.from_pretrained(
-            MODEL1_PATH, quantization_config=bnb,
-            device_map="cuda:0", torch_dtype=torch.float16,
-        ).eval()
-    else:
-        _actor_model0 = utils.get_model(
-            'qwen2.5-7b-it', model_class=AutoModelForCausalLM, model_path=MODEL0_PATH
-        ).to(device).eval()
-        _actor_model1 = utils.get_model(
-            'qwen2.5-7b-it', model_class=AutoModelForCausalLM, model_path=MODEL1_PATH
-        ).to(device).eval()
+    bnb = BitsAndBytesConfig(
+        load_in_4bit=True, bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True,
+    )
 
-    print("加载多比特水印解码器: RewardModel (Qwen2.5-1.5B + v_head)...")
-    if USE_4BIT:
-        base_model = AutoModelForCausalLM.from_pretrained(
-            RM_PATH, quantization_config=_build_4bit_config(),
-            device_map="cuda:0", torch_dtype=torch.float16,
-        )
-    else:
-        base_model = utils.get_model('qwen2.5-1.5b', model_path=RM_PATH)
+    # ── RewardModel: GPU 4-bit (先加载, 占~1.1GB) ──
+    print("加载 RewardModel (1.5B, GPU 4-bit)...")
+    base_model = AutoModel.from_pretrained(
+        RM_PATH, quantization_config=bnb,
+        device_map="cuda:0", low_cpu_mem_usage=True,
+    )
     _reward_model = model_utils.RewardModel(base_model, _tokenizer)
     _reward_model.v_head.load_state_dict(
         torch.load(RM_HEADER_PATH, map_location='cpu', weights_only=True)
@@ -141,25 +211,45 @@ def load_multibit_models():
         next(_reward_model.rwtransformer.parameters()).device
     )
     _reward_model.eval()
+    alloc_rm = torch.cuda.memory_allocated(0) / 1024**3
+    print(f"  RewardModel GPU: {alloc_rm:.1f} GB")
 
-    print("加载语义相似度模型: all-mpnet-base-v2...")
-    if USE_4BIT:
-        _sim_tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
-        _sim_model = AutoModel.from_pretrained(
-            'sentence-transformers/all-mpnet-base-v2'
-        ).to(device)  # mpnet 只有 110M, GPU 放得下
-    else:
-        _sim_tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
-        _sim_model = AutoModel.from_pretrained('sentence-transformers/all-mpnet-base-v2').to(device)
+    # ── Model0: GPU 4-bit ──────────────────────────
+    print("加载 model0 (GPU 4-bit)...")
+    _actor_model0 = AutoModelForCausalLM.from_pretrained(
+        MODEL0_PATH, quantization_config=bnb,
+        device_map="cuda:0", low_cpu_mem_usage=True,
+    ).eval()
+    alloc_all = torch.cuda.memory_allocated(0) / 1024**3
+    print(f"  model0 + RM GPU: {alloc_all:.1f} GB")
+
+    # ── Model1: CPU fp16 (最后加载,避免与其他模型争CPU RAM) ──
+    print("加载 model1 (CPU fp16)...")
+    from transformers import PreTrainedModel
+    _orig_init_missing = PreTrainedModel._initialize_missing_keys
+    PreTrainedModel._initialize_missing_keys = (
+        lambda self, is_quantized: None
+    )
+    try:
+        _actor_model1 = AutoModelForCausalLM.from_pretrained(
+            MODEL1_PATH, torch_dtype=torch.float16,
+            device_map="cpu", low_cpu_mem_usage=True,
+        ).eval()
+    finally:
+        PreTrainedModel._initialize_missing_keys = _orig_init_missing
+    print("  model1 加载完成")
+
+    # ── 语义相似度模型 ──────────────────────────────
+    print("加载 all-mpnet-base-v2...")
+    _sim_tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
+    _sim_model = AutoModel.from_pretrained('sentence-transformers/all-mpnet-base-v2').to(device)
 
     _multibit_loaded = True
-    allocated = torch.cuda.memory_allocated(0) / 1024**3 if torch.cuda.is_available() else 0
-    print(f"模型加载完成 (GPU 已用: {allocated:.1f} GB)\n")
+    print("模型加载完成\n")
 
 
 # ── 多比特水印嵌入 ────────────────────────────────
 def embed_multi_bit_watermark(text, key=None):
-    """使用 Dual-Model Paraphraser 嵌入水印, 对齐 watermark_demo.py"""
     load_multibit_models()
     if key is None:
         key = FULL_KEY
@@ -171,7 +261,7 @@ def embed_multi_bit_watermark(text, key=None):
     best_score, best_info = None, None
 
     with torch.no_grad():
-        for repeat_i_st in range(0, N_REPEAT, BATCH_SIZE):
+        for _ in range(N_REPEAT):
             input_ids = toks['input_ids'].repeat(BATCH_SIZE, 1)
             attention_mask = toks['attention_mask'].repeat(BATCH_SIZE, 1)
 
@@ -182,45 +272,44 @@ def embed_multi_bit_watermark(text, key=None):
                 pad_token_id=_tokenizer.pad_token_id, do_sample=True,
             )
 
-            for bid in range(BATCH_SIZE):
-                para_txt = _tokenizer.decode(seq[bid, prompt_length:], skip_special_tokens=True)
-                split_sentences = gen_utils.split_sentence(para_txt)
-                new_toks_list = [
-                    _tokenizer(one_sent.strip(), return_tensors='pt')['input_ids'][
-                        0, _reward_model.num_padding_at_beginning:
-                    ]
-                    for one_sent in split_sentences
+            para_txt = _tokenizer.decode(seq[0, prompt_length:], skip_special_tokens=True)
+            split_sentences = gen_utils.split_sentence(para_txt)
+            new_toks_list = [
+                _tokenizer(one_sent.strip(), return_tensors='pt')['input_ids'][
+                    0, _reward_model.num_padding_at_beginning:
                 ]
-                if len(_tokenizer.decode(new_toks_list[-1], skip_special_tokens=True).strip()) == 0:
-                    new_toks_list = new_toks_list[:-1]
-                if len(new_toks_list) == 0:
-                    continue
+                for one_sent in split_sentences
+            ]
+            if len(_tokenizer.decode(new_toks_list[-1], skip_special_tokens=True).strip()) == 0:
+                new_toks_list = new_toks_list[:-1]
+            if len(new_toks_list) == 0:
+                continue
 
-                cur_input_ids, cur_attention_mask = utils.process_token_list(
-                    _tokenizer, new_toks_list, _reward_model.device
-                )
-                pred = _reward_model.forward_value(
-                    cur_input_ids, cur_attention_mask, prompt_length=1, return_value_only=False
-                )["chosen_end_scores"]
+            cur_input_ids, cur_attention_mask = utils.process_token_list(
+                _tokenizer, new_toks_list, _reward_model.device
+            )
+            pred = _reward_model.forward_value(
+                cur_input_ids, cur_attention_mask, prompt_length=1, return_value_only=False
+            )["chosen_end_scores"]
 
-                sim_reward = (
-                    utils.calc_text_sim(_sim_model, _sim_tokenizer, [text], [para_txt],
-                                        _sim_model.device)[0].item()
-                    + utils.calc_rogue_lcs_score(_tokenizer, [text], [para_txt])
-                ) / 2
+            sim_reward = (
+                utils.calc_text_sim(_sim_model, _sim_tokenizer, [text], [para_txt],
+                                    _sim_model.device)[0].item()
+                + utils.calc_rogue_lcs_score(_tokenizer, [text], [para_txt])
+            ) / 2
 
-                cur_keys = key[:len(cur_input_ids)]
-                cur_acc = ((pred > 0).float().cpu().numpy() == np.array(cur_keys)).astype(float).mean()
-                cur_avg_score = ((pred > 0).float().cpu().numpy() * (np.array(cur_keys) * 2 - 1)).mean()
+            cur_keys = key[:len(cur_input_ids)]
+            cur_acc = ((pred > 0).float().cpu().numpy() == np.array(cur_keys)).astype(float).mean()
+            cur_avg_score = ((pred > 0).float().cpu().numpy() * (np.array(cur_keys) * 2 - 1)).mean()
 
-                para_len = len(split_sentences)
-                ori_len = len(gen_utils.split_sentence(text))
-                len_penalty = ((para_len - ori_len) / max(para_len, ori_len)) ** 2
-                cur_score = cur_acc + sim_reward + 0.01 * cur_avg_score + 1.0 * len_penalty
+            para_len = len(split_sentences)
+            ori_len = len(gen_utils.split_sentence(text))
+            len_penalty = ((para_len - ori_len) / max(para_len, ori_len)) ** 2
+            cur_score = cur_acc + sim_reward + 0.01 * cur_avg_score + 1.0 * len_penalty
 
-                if best_score is None or best_score < cur_score:
-                    best_score = cur_score
-                    best_info = (para_txt, split_sentences, cur_keys, pred)
+            if best_score is None or best_score < cur_score:
+                best_score = cur_score
+                best_info = (para_txt, split_sentences, cur_keys, pred)
 
     if best_info is None:
         return text, [], [], []
@@ -230,7 +319,6 @@ def embed_multi_bit_watermark(text, key=None):
 
 # ── 多比特水印提取 ────────────────────────────────
 def extract_multi_bit_watermark(text, msg_len):
-    """RewardModel 逐句分类提取, 对齐 eval_utils.py"""
     load_multibit_models()
     split_sentences = gen_utils.split_sentence(text)
     if len(split_sentences) == 0:
@@ -315,22 +403,20 @@ def llm_paraphrase_attack(text):
 if __name__ == "__main__":
     print("=" * 60)
     print(f"[测试 9] 多比特水印 (Multi-bit) — Dual-Model Paraphraser + RewardModel")
-    print(f"  GPU: {VRAM_GB:.1f} GB VRAM  |  模式: {'4-bit' if USE_4BIT else 'bf16'}")
-    print(f"  对齐: watermark_demo.py + eval_utils.py")
+    print(f"  GPU: {VRAM_GB:.1f} GB VRAM  |  model0 GPU 4-bit + model1 CPU fp16")
+    print(f"  非mmap加载 + 本地fp16模型")
     print("=" * 60 + "\n")
 
     if not torch.cuda.is_available():
         print("[错误] 需要 CUDA GPU。")
         sys.exit(1)
 
-    if VRAM_GB < 10:
-        print(f"[错误] GPU 显存不足 ({VRAM_GB:.1f} GB)。")
-        print(f"  多比特水印需同时加载 2× Qwen2.5-7B (4-bit ≈ 10 GB) + RewardModel。")
-        print(f"  建议: 使用 ≥16 GB VRAM GPU (T4/V100/RTX 4080/A6000) 或云端 GPU。")
-        print(f"  代码逻辑已验证正确, 仅受限于硬件。")
+    if not os.path.isdir(MODEL0_PATH):
+        print(f"[错误] 本地fp16模型未找到: {MODEL0_PATH}")
+        print("  请先运行模型转换")
         sys.exit(1)
 
-    # ── 加载测试文本 ───────────────────────────────
+    # ── 测试文本 ──────────────────────────────────
     test_text_path = os.path.join(MULTIBIT_PROJECT, "watermark_test_text.txt")
     test_texts = []
     if os.path.exists(test_text_path):
@@ -349,35 +435,34 @@ if __name__ == "__main__":
     if not test_texts:
         test_texts = [
             "The quick brown fox jumps over the lazy dog. It was a beautiful day.",
-            "Artificial intelligence has made remarkable progress. Large language models can now generate human-like text.",
         ]
 
-    test_texts = test_texts[:min(MAX_SAMPLES, len(test_texts))]
+    test_texts = test_texts[:MAX_SAMPLES]
     target_key = FULL_KEY[:16]
     msg_len = len(target_key)
 
     print(f"测试样本: {len(test_texts)}")
     print(f"目标密钥 ({msg_len}-bit): {target_key}")
-    print(f"MAX_INP={MAX_INP_LEN}, MAX_ANS={MAX_ANS_LEN}, N_REPEAT={N_REPEAT}\n")
+    print(f"MAX_ANS={MAX_ANS_LEN}, N_REPEAT={N_REPEAT}\n")
+    print("注意: model1 在CPU上推理, 生成阶段会很慢\n")
 
-    # ── 实验循环 ───────────────────────────────────
+    # ── 实验循环 ──────────────────────────────────
     mb_results = []
     for idx, base_text in enumerate(tqdm(test_texts, desc="多比特水印测试")):
-        # 1. 嵌入
         wm_text, wm_sents, cur_keys, pred_scores = embed_multi_bit_watermark(
             base_text, key=target_key
         )
         actual_key = (cur_keys[:msg_len] if len(cur_keys) >= msg_len
                       else cur_keys + [0] * (msg_len - len(cur_keys)))
 
-        # 2. 无攻击
+        # 无攻击
         ext_orig, _, _ = extract_multi_bit_watermark(wm_text, msg_len)
         mb_results.append({
             "Sample": idx, "State": "1_Original",
             "Bit Accuracy (%)": bit_accuracy(actual_key, ext_orig) * 100
         })
 
-        # 3. Word Drop 10%
+        # Word Drop 10%
         wd10 = simulate_word_drop(wm_text, 0.10)
         ext_wd10, _, _ = extract_multi_bit_watermark(wd10, msg_len)
         mb_results.append({
@@ -385,7 +470,7 @@ if __name__ == "__main__":
             "Bit Accuracy (%)": bit_accuracy(actual_key, ext_wd10) * 100
         })
 
-        # 4. Word Drop 30%
+        # Word Drop 30%
         wd30 = simulate_word_drop(wm_text, 0.30)
         ext_wd30, _, _ = extract_multi_bit_watermark(wd30, msg_len)
         mb_results.append({
@@ -393,7 +478,7 @@ if __name__ == "__main__":
             "Bit Accuracy (%)": bit_accuracy(actual_key, ext_wd30) * 100
         })
 
-        # 5. T5 Rewrite
+        # T5 Rewrite
         t5_text = llm_paraphrase_attack(wm_text)
         ext_t5, _, _ = extract_multi_bit_watermark(t5_text, msg_len)
         mb_results.append({
@@ -401,7 +486,7 @@ if __name__ == "__main__":
             "Bit Accuracy (%)": bit_accuracy(actual_key, ext_t5) * 100
         })
 
-    # ── 汇总 ───────────────────────────────────────
+    # ── 汇总 ──────────────────────────────────────
     df_mb = pd.DataFrame(mb_results)
     df_mb['State'] = df_mb['State'].str.split('_', n=1).str[1]
 
@@ -411,7 +496,7 @@ if __name__ == "__main__":
     print("\n=== [数据表] 多比特水印 (16-bit) 比特准确率 ===")
     print(summary.to_string(index=False))
 
-    # ── 绘图 ───────────────────────────────────────
+    # ── 绘图 ──────────────────────────────────────
     sns.set_theme(style="whitegrid")
     plt.rcParams['font.sans-serif'] = ['Arial']
 
@@ -422,9 +507,8 @@ if __name__ == "__main__":
                 ax=ax1, capsize=.1, errorbar="sd", palette="viridis")
     ax1.axhline(y=50.0, color='#d9534f', linestyle='--', linewidth=2,
                 label='Random Guess (50%)')
-    mode_label = "4-bit" if USE_4BIT else "bf16"
-    ax1.set_title(f'Multi-bit Payload Robustness (16-bit)\n'
-                  f'Dual-Model Paraphraser + RewardModel [{mode_label}]',
+    ax1.set_title('Multi-bit Payload Robustness (16-bit)\n'
+                  'GPU 4-bit + CPU fp16 [non-mmap load]',
                   fontsize=13, fontweight='bold')
     ax1.set_ylabel('Bit Accuracy (%)', fontsize=12)
     ax1.set_ylim(0, 105)
