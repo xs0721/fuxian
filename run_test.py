@@ -25,6 +25,7 @@ TEST_SCRIPTS = {
     "6": "test6_kd_radioactivity.py",
     "7": "test7_b4_proxy_erasure.py",
     "8": "test8_adaptive_stealing.py",
+    "9": "test9_multibit_watermark.py",
 }
 
 def run_test(num):
