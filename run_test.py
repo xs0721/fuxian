@@ -26,6 +26,8 @@ TEST_SCRIPTS = {
     "7": "test7_b4_proxy_erasure.py",
     "8": "test8_adaptive_stealing.py",
     "9": "test9_multibit_watermark.py",
+    "10": "test10_watermark_smoothing.py",
+    "11": "test11_waterpark_fidelity.py",
 }
 
 def run_test(num):
