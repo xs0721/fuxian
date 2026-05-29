@@ -28,6 +28,8 @@ TEST_SCRIPTS = {
     "9": "test9_multibit_watermark.py",
     "10": "test10_watermark_smoothing.py",
     "11": "test11_waterpark_fidelity.py",
+    "12": "test12_demark_removal.py",
+    "13": "test13_ditto_spoofing.py",
 }
 
 def run_test(num):
