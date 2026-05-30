@@ -1,15 +1,9 @@
 import torch
 import torch.nn.functional as F
 import math
-import mplcursors
 import os
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 from tqdm import tqdm
-from datasets import load_dataset
-from scipy.stats import norm, gamma  # WaterMax p-value
 from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessor, LogitsProcessorList
 
 # ================= ===================================
@@ -452,6 +446,7 @@ def generate_watermax(model, tokenizer, prompts, max_gen_len, num_seq=3,
 def detect_watermax(text, tokenizer, ngram=3, split_len=None,
                      salt_key=35317, seed=0):
     """WaterMax 检测 — 逐块高斯评分 + Gamma CDF p值 → z-score"""
+    from scipy.stats import norm, gamma  # lazy import 避免 pyarrow DLL 冲突
     tokens = tokenizer.encode(text, add_special_tokens=False)
     total_len = len(tokens)
     if split_len is None: split_len = total_len
@@ -575,6 +570,10 @@ def calculate_ppl(text, model, tokenizer, device):
 # 3. 自动化绘图引擎定义 (优化版：带统计表格的 2x2 布局)
 # ================= ===================================
 def generate_benchmark_plots(csv_path):
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import mplcursors
     print(f"\n[可视化生成] 正在读取数据并自动生成高级学术图表...")
     df = pd.read_csv(csv_path)
 
@@ -693,6 +692,11 @@ def generate_benchmark_plots(csv_path):
 
 
 if __name__ == "__main__":
+    from datasets import load_dataset
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import mplcursors
     DATASET_CONFIGS = {
         "C4_News": {"path": "allenai/c4", "name": "realnewslike", "text_col": "text"},
         "Wiki_Academic": {"path": "wikitext", "name": "wikitext-2-raw-v1", "text_col": "text"},
