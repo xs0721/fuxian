@@ -135,17 +135,156 @@ class SemStampLogitsProcessor(LogitsProcessor):
         return scores
 
 
+# ── Gumbel 水印 (Exp-Watermark) ─────────────────────
+def _gumbel_key(generator, n, vocab_size):
+    """密钥: xi (n×V 随机矩阵) + pi (恒等排列)"""
+    return torch.rand((n, vocab_size), generator=generator), torch.arange(vocab_size)
+
+
+def _gumbel_sample(probs, pi, xi):
+    """Gumbel-max 采样: argmax(xi^(1/probs))"""
+    return torch.argmax(xi ** (1 / probs.gather(1, pi.unsqueeze(0).expand(probs.shape[0], -1))),
+                        dim=1).unsqueeze(-1)
+
+
+def _gumbel_score(tokens, xi):
+    """检测统计量: -sum(log(1/(1-xi)))"""
+    xi_samp = xi.gather(-1, tokens.unsqueeze(-1)).squeeze()
+    return -torch.sum(torch.log(1 / (1 - xi_samp))).item()
+
+
+def generate_gumbel(model, tokenizer, prompt_ids, attn, max_new, seed, vocab_size, device="cuda"):
+    """Gumbel 水印生成 — 自定义采样循环 (非LogitsProcessor)"""
+    n_key = 256
+    generator = torch.Generator(); generator.manual_seed(int(seed))
+    xi, pi = _gumbel_key(generator, n_key, vocab_size)
+    offset = torch.randint(n_key, size=(1,)).item()
+
+    input_ids = prompt_ids.to(device)
+    past = None
+    for i in range(max_new):
+        with torch.no_grad():
+            if past is not None:
+                output = model(input_ids[:, -1:], past_key_values=past, attention_mask=attn)
+            else:
+                output = model(input_ids)
+        probs = torch.softmax(output.logits[:, -1], dim=-1).cpu()
+        tok = _gumbel_sample(probs, pi, xi[(offset + i) % n_key].unsqueeze(0)).to(device)
+        input_ids = torch.cat([input_ids, tok], dim=-1)
+        past = output.past_key_values
+        attn = torch.cat([attn, attn.new_ones((attn.shape[0], 1))], dim=-1)
+
+    return input_ids, xi, offset
+
+
+def detect_gumbel(text, tokenizer, vocab_size, xi, offset, seed, n_runs=200):
+    """Gumbel 置换检验检测"""
+    tokens = tokenizer.encode(text, return_tensors="pt")[0]
+    tokens = tokens[offset:] if offset > 0 else tokens
+    T = min(len(tokens), len(xi))
+    if T < 10: return 0.0
+    test_tokens, xi_slice = tokens[:T], xi[:T]
+    test_score = _gumbel_score(test_tokens, xi_slice)
+
+    null_scores = []
+    null_gen = torch.Generator(); null_gen.manual_seed(int(seed + 1))
+    for _ in range(n_runs):
+        perm = torch.randperm(T, generator=null_gen)
+        null_scores.append(_gumbel_score(test_tokens[perm], xi_slice))
+    null_scores = torch.tensor(null_scores)
+    return (test_score - null_scores.mean().item()) / null_scores.std().item() if null_scores.std() > 0 else 0.0
+
+
+# ── Transform 水印 (Exp-Watermark) ──────────────────
+def _transform_key(generator, n, vocab_size):
+    """密钥: xi (n×1 随机) + pi (随机排列)"""
+    return torch.rand((n, 1), generator=generator), torch.randperm(vocab_size, generator=generator)
+
+
+def _transform_sample(probs, pi, xi):
+    """逆变换采样: CDF(permuted_probs) → searchsorted(xi) → pi映射"""
+    cdf = torch.cumsum(probs.gather(1, pi.unsqueeze(0).expand(probs.shape[0], -1)), dim=1)
+    idx = torch.searchsorted(cdf, xi.unsqueeze(0).expand(probs.shape[0], -1, -1))
+    return pi[idx.clamp(0, cdf.shape[1] - 1).squeeze(-1)].unsqueeze(-1)
+
+
+def _transform_score(tokens, xi):
+    """检测统计量: L1距离"""
+    return torch.norm(tokens.float() - xi[:len(tokens)].squeeze(), p=1).item() if len(tokens) > 0 else 0.0
+
+
+def generate_transform(model, tokenizer, prompt_ids, attn, max_new, seed, vocab_size, device="cuda"):
+    """Transform 水印生成 — 自定义采样循环"""
+    n_key = 256
+    generator = torch.Generator(); generator.manual_seed(int(seed))
+    xi, pi = _transform_key(generator, n_key, vocab_size)
+    offset = torch.randint(n_key, size=(1,)).item()
+
+    input_ids = prompt_ids.to(device)
+    past = None
+    for i in range(max_new):
+        with torch.no_grad():
+            if past is not None:
+                output = model(input_ids[:, -1:], past_key_values=past, attention_mask=attn)
+            else:
+                output = model(input_ids)
+        probs = torch.softmax(output.logits[:, -1], dim=-1).cpu()
+        tok = _transform_sample(probs, pi, xi[(offset + i) % n_key].view(1, 1)).to(device)
+        input_ids = torch.cat([input_ids, tok], dim=-1)
+        past = output.past_key_values
+        attn = torch.cat([attn, attn.new_ones((attn.shape[0], 1))], dim=-1)
+
+    return input_ids, xi, pi, offset
+
+
+def detect_transform(text, tokenizer, vocab_size, xi, pi, offset, seed, n_runs=200):
+    """Transform 置换检验检测"""
+    tokens = tokenizer.encode(text, return_tensors="pt")[0]
+    tokens = tokens[offset:] if offset > 0 else tokens
+    T = min(len(tokens), len(xi))
+    if T < 10: return 0.0
+    test_tokens = tokens[:T].float()
+    xi_slice = xi[:T]
+    inv_pi = torch.argsort(pi).float()
+    mapped = inv_pi[test_tokens.long()] / vocab_size
+    test_score = _transform_score(mapped, xi_slice)
+
+    null_scores = []
+    null_gen = torch.Generator(); null_gen.manual_seed(int(seed + 1))
+    for _ in range(n_runs):
+        perm = torch.randperm(T, generator=null_gen)
+        null_mapped = inv_pi[test_tokens[perm].long()] / vocab_size
+        null_scores.append(_transform_score(null_mapped, xi_slice))
+    null_scores = torch.tensor(null_scores)
+    return (null_scores.mean().item() - test_score) / null_scores.std().item() if null_scores.std() > 0 else 0.0
+
+
+# ── 水印生成/检测缓存 (用于Gumbel/Transform的状态) ──
+_GUMBEL_STATE = {}
+_TRANSFORM_STATE = {}
+
+
 def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_key=15485863):
     """
     智能路由检测引擎
     """
     if algo_name == "Natural": return 0.0
-    
+
     tokens = tokenizer.encode(text, return_tensors="pt")[0]
     total_tokens = len(tokens) - 1
     if total_tokens <= 0: return 0.0
 
     green_tokens_count = 0
+
+    if algo_name == "Gumbel":
+        state = _GUMBEL_STATE.get(text, {})
+        if not state: return 0.0
+        return detect_gumbel(text, tokenizer, vocab_size, state['xi'], state['offset'], state['seed'])
+
+    if algo_name == "Transform":
+        state = _TRANSFORM_STATE.get(text, {})
+        if not state: return 0.0
+        return detect_transform(text, tokenizer, vocab_size, state['xi'], state['pi'], state['offset'], state['seed'])
 
     # 雷达 A：前缀哈希检测器 (加入 DiPmark)
     if algo_name in ["KGW", "SWEET", "DiPmark"]:
@@ -323,7 +462,9 @@ if __name__ == "__main__":
         "SWEET": LogitsProcessorList([SWEETLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE, entropy_threshold=1.5)]),
         "DiPmark": LogitsProcessorList([DiPmarkLogitsProcessor(model.config.vocab_size, alpha=0.6)]),
         "Unigram": LogitsProcessorList([UnigramLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),
-        "SemStamp": LogitsProcessorList([SemStampLogitsProcessor(tokenizer)])
+        "SemStamp": LogitsProcessorList([SemStampLogitsProcessor(tokenizer)]),
+        "Gumbel": "GUMBEL",   # 自定义采样 (非LogitsProcessor)
+        "Transform": "TRANSFORM",  # 自定义采样 (非LogitsProcessor)
     }
 
     results = []
@@ -353,17 +494,32 @@ if __name__ == "__main__":
             inputs = {k: v.to(device) for k, v in tokens.items()}
             row_result = {"Dataset": ds_name, "Sample_ID": sample_count + 1}
 
+            seed = 42 + sample_count
+            attn_mask = inputs["attention_mask"]
+
             for algo_name, processor in algorithms.items():
-                torch.manual_seed(42 + sample_count) 
+                torch.manual_seed(seed)
 
-                generate_kwargs = {**inputs, "max_new_tokens": GENERATE_LENGTH, "do_sample": True, "temperature": 0.7}
-                if processor is not None:
-                    generate_kwargs["logits_processor"] = processor
+                if algo_name == "Gumbel":
+                    out_ids, xi, offset = generate_gumbel(
+                        model, tokenizer, inputs["input_ids"], attn_mask,
+                        GENERATE_LENGTH, seed, model.config.vocab_size, device)
+                    text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
+                    _GUMBEL_STATE[text] = {'xi': xi, 'offset': offset, 'seed': seed}
+                elif algo_name == "Transform":
+                    out_ids, xi, pi, offset = generate_transform(
+                        model, tokenizer, inputs["input_ids"], attn_mask,
+                        GENERATE_LENGTH, seed, model.config.vocab_size, device)
+                    text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
+                    _TRANSFORM_STATE[text] = {'xi': xi, 'pi': pi, 'offset': offset, 'seed': seed}
+                else:
+                    generate_kwargs = {**inputs, "max_new_tokens": GENERATE_LENGTH, "do_sample": True, "temperature": 0.7}
+                    if processor is not None:
+                        generate_kwargs["logits_processor"] = processor
+                    outputs = model.generate(**generate_kwargs)
+                    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-                outputs = model.generate(**generate_kwargs)
-                text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-                row_result[f"Z_Score_{algo_name}"] = round(detect_watermark(text, algo_name,tokenizer, model.config.vocab_size), 3)
+                row_result[f"Z_Score_{algo_name}"] = round(detect_watermark(text, algo_name, tokenizer, model.config.vocab_size), 3)
                 row_result[f"PPL_{algo_name}"] = round(calculate_ppl(text, model, tokenizer, device), 3)
                 if algo_name != "Natural":
                     row_result[f"Text_{algo_name}"] = text
