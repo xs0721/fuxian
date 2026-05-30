@@ -33,6 +33,7 @@ TEST_SCRIPTS = {
     "14": "test14_multikey_removal.py",
     "15": "test15_api_query_attack.py",
     "16": "test16_robustness_spoofing.py",
+    "17": "test17_watermark_learnability.py",
 }
 
 def run_test(num):
