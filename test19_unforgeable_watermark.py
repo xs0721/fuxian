@@ -6,62 +6,6 @@ print_test_header("不可伪造水印 (Unforgeable UPV) — 神经网络私钥�
 
 
 # ── 神经网络水印划分器 ──────────────────────────────
-class _SimpleWatermarkNet(torch.nn.Module):
-    """小型神经网络将token上下文映射为绿/红判定 (对齐 model_key.py BinaryClassifier)
-
-    真实 UPV 用更深的 SubNet + 训练流程.
-    这里用浅层网络代理, 捕获核心思想: 网络权重 = 私钥.
-    """
-    def __init__(self, context_len=4, hidden=32):
-        super().__init__()
-        self.context_len = context_len
-        self.net = torch.nn.Sequential(
-            torch.nn.Linear(context_len, hidden),
-            torch.nn.ReLU(),
-            torch.nn.Linear(hidden, 1),
-            torch.nn.Sigmoid(),
-        )
-        # 用固定种子初始化 (模拟训练后的权重)
-        g = torch.Generator(); g.manual_seed(42)
-        for p in self.net.parameters():
-            torch.nn.init.uniform_(p, -0.5, 0.5, generator=g)
-
-    def forward(self, context_tokens):
-        """输入: context token IDs, 输出: 每个vocab token的"绿度"分数"""
-        ctx = context_tokens.float() / 50272.0  # 归一化
-        return self.net(ctx.unsqueeze(0)).squeeze()
-
-
-class UnforgeableLogitsProcessor(LogitsProcessor):
-    """不可伪造水印: 神经网络划分绿名单 — 权重为私钥
-
-    与 KGW 的本质区别:
-      - KGW: 绿名单 = randperm(seed=hash_key * prev_token) — 公开算法, 知道密钥即可复现
-      - UPV: 绿名单 = NeuralNet(prev_token) — 私有权重, 攻击者无法逆向
-
-    代理: 固定网络权重 (模拟训练后)
-    """
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0):
-        self.vocab_size = vocab_size; self.gamma = gamma; self.delta = delta
-        self.net = _SimpleWatermarkNet(context_len=1)
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            prev = torch.tensor([input_ids[b, -1].item() % 50272], dtype=torch.float32)
-            greenness = self.net(prev)  # [1] → 标量
-            # 用greenness作为绿名单比例的自适应调整
-            effective_gamma = self.gamma * (0.5 + 0.5 * float(greenness))
-            greenlist_size = max(1, int(self.vocab_size * effective_gamma))
-
-            # 基于网络输出的确定性划分 (网络权重=私钥)
-            g = torch.Generator(device='cpu')
-            # 种子=网络隐含层输出的hash (攻击者无法复现)
-            hidden_repr = int(float(greenness) * 1e6) + input_ids[b, -1].item()
-            g.manual_seed(hidden_repr % (2**31 - 1))
-            perm = torch.randperm(self.vocab_size, generator=g)
-            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
-        return scores
-
 
 def detect_unforgeable(text, tokenizer, vocab_size, net, gamma=0.5):
     """不可伪造水印检测: 使用同一网络重建绿名单 → z-test

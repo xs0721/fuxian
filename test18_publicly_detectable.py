@@ -6,40 +6,6 @@ print_test_header("公开可检测水印 (Publicly-Detectable) — 非对称密�
 
 
 # ── 非对称水印: 私钥生成 + 公钥检测 ─────────────────
-class PubliclyDetectableProcessor(LogitsProcessor):
-    """公开可检测水印的代理实现 (简化BLS签名 → SHA256 HMAC)
-
-    核心思想:
-      - 私钥 (secret_key): 用于生成时确定绿名单 — 生成方持有, 不公开
-      - 公钥 (public_salt): 用于检测时验证绿名单 — 任何人可获取, 但无法逆向私钥
-      - 非对称性: 知道公钥可以检测水印, 但无法伪造水印 (因为不知道绿名单划分)
-
-    代理实现: 私钥=HMAC(secret, context) → 种子 → 绿名单
-              公钥=HMAC(public_salt, context) → 不同的种子 → 不同的绿名单
-              检测端用公钥的绿名单统计 → 如果文本是私钥生成的,
-              公钥绿名单与私钥绿名单有统计相关性 (但不能精确重建)
-    """
-
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, secret_key=15485863,
-                 public_salt=9876543):
-        self.vocab_size = vocab_size; self.gamma = gamma
-        self.delta = delta; self.secret_key = secret_key
-        self.public_salt = public_salt
-
-    def _get_greenlist(self, prev_token, key):
-        """基于密钥的确定性绿名单划分"""
-        h = hashlib.sha256(f"{key}_{prev_token}".encode()).digest()
-        seed = int.from_bytes(h[:4], 'big') % (2**31 - 1)
-        g = torch.Generator(device='cpu'); g.manual_seed(seed)
-        greenlist_size = int(self.vocab_size * self.gamma)
-        return torch.randperm(self.vocab_size, generator=g)[:greenlist_size]
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            greenlist = self._get_greenlist(input_ids[b, -1].item(), self.secret_key)
-            scores[b, greenlist.to(scores.device)] += self.delta
-        return scores
-
 
 def detect_publicly_detectable(text, tokenizer, vocab_size, public_salt=9876543,
                                 gamma=0.5):

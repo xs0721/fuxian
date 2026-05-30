@@ -1,6 +1,7 @@
 """各测试共用的配置、模型和工具函数"""
 import sys
 import os
+import hashlib
 
 # 强制 UTF-8 编码, 解决 Windows 终端 GBK 显示乱码问题
 if sys.stdout.encoding != 'utf-8':
@@ -51,6 +52,77 @@ class KGWLogitsProcessor(LogitsProcessor):
             g = torch.Generator(device='cpu')
             g.manual_seed(self.hash_key * input_ids[b, -1].item())
             greenlist_size = int(self.vocab_size * self.gamma)
+            perm = torch.randperm(self.vocab_size, generator=g)
+            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
+        return scores
+
+
+class SmoothedWatermarkLogitsProcessor(LogitsProcessor):
+    """平滑水印 — 连续均匀绿度 U(0,1) 替换硬二元掩码, 消除断层"""
+    def __init__(self, vocab_size, delta=3.5, hash_key=15485863):
+        self.vocab_size = vocab_size; self.delta = delta; self.hash_key = hash_key
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            g = torch.Generator(device='cpu')
+            g.manual_seed(self.hash_key * input_ids[b, -1].item())
+            continuous_greenness = torch.rand(self.vocab_size, generator=g)
+            scores[b] += self.delta * continuous_greenness.to(scores.device)
+        return scores
+
+
+class PubliclyDetectableProcessor(LogitsProcessor):
+    """公开可检测水印 — 私钥生成 + 公钥检测 (非对称密钥架构)"""
+    def __init__(self, vocab_size, gamma=0.5, delta=2.0, secret_key=15485863,
+                 public_salt=9876543):
+        self.vocab_size = vocab_size; self.gamma = gamma
+        self.delta = delta; self.secret_key = secret_key
+        self.public_salt = public_salt
+
+    def _get_greenlist(self, prev_token, key):
+        h = hashlib.sha256(f"{key}_{prev_token}".encode()).digest()
+        seed = int.from_bytes(h[:4], 'big') % (2**31 - 1)
+        g = torch.Generator(device='cpu'); g.manual_seed(seed)
+        greenlist_size = int(self.vocab_size * self.gamma)
+        return torch.randperm(self.vocab_size, generator=g)[:greenlist_size]
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            greenlist = self._get_greenlist(input_ids[b, -1].item(), self.secret_key)
+            scores[b, greenlist.to(scores.device)] += self.delta
+        return scores
+
+
+class _SimpleWatermarkNet(torch.nn.Module):
+    """小型神经网络: token上下文 → 绿度分数 (UPV 私钥划分器)"""
+    def __init__(self, context_len=1, hidden=32):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(context_len, hidden), torch.nn.ReLU(),
+            torch.nn.Linear(hidden, 1), torch.nn.Sigmoid())
+        g = torch.Generator(); g.manual_seed(42)
+        for p in self.net.parameters():
+            torch.nn.init.uniform_(p, -0.5, 0.5, generator=g)
+
+    def forward(self, context_tokens):
+        return self.net(context_tokens.float().unsqueeze(0) / 50272.0).squeeze()
+
+
+class UnforgeableLogitsProcessor(LogitsProcessor):
+    """不可伪造水印 — 神经网络权重=私钥, 攻击者无法逆向绿名单划分"""
+    def __init__(self, vocab_size, gamma=0.5, delta=2.0):
+        self.vocab_size = vocab_size; self.gamma = gamma; self.delta = delta
+        self.net = _SimpleWatermarkNet(context_len=1)
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            prev = torch.tensor([input_ids[b, -1].item() % 50272], dtype=torch.float32)
+            greenness = self.net(prev)
+            effective_gamma = self.gamma * (0.5 + 0.5 * float(greenness))
+            greenlist_size = max(1, int(self.vocab_size * effective_gamma))
+            hidden_repr = int(float(greenness) * 1e6) + input_ids[b, -1].item()
+            g = torch.Generator(device='cpu')
+            g.manual_seed(hidden_repr % (2**31 - 1))
             perm = torch.randperm(self.vocab_size, generator=g)
             scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
         return scores

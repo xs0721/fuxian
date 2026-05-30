@@ -6,21 +6,6 @@ print_test_header("水印平滑 (Watermark Smoothing) 连续绿度分布 vs KGW 
 
 load_attacker()  # SIRA Stage 1 + Stage 3 需要 T5
 
-class SmoothedWatermarkLogitsProcessor(LogitsProcessor):
-    """平滑水印 — 连续均匀绿度 U(0,1) 替换硬二元掩码，消除断层"""
-    def __init__(self, vocab_size, delta=3.5, hash_key=15485863):
-        self.vocab_size = vocab_size
-        self.delta = delta
-        self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            continuous_greenness = torch.rand(self.vocab_size, generator=g)
-            scores[b] += self.delta * continuous_greenness.to(scores.device)
-        return scores
-
 
 # ── 检测器 ─────────────────────────────────────────
 def detect_kgw(text, tokenizer, vocab_size, gamma=0.5, hash_key=15485863):
