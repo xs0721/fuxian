@@ -30,6 +30,9 @@ TEST_SCRIPTS = {
     "11": "test11_waterpark_fidelity.py",
     "12": "test12_demark_removal.py",
     "13": "test13_ditto_spoofing.py",
+    "14": "test14_multikey_removal.py",
+    "15": "test15_api_query_attack.py",
+    "16": "test16_robustness_spoofing.py",
 }
 
 def run_test(num):
