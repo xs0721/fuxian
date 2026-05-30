@@ -1,3 +1,4 @@
+import pyarrow  # 必须最先导入, 避免与Anaconda的pyarrow DLL冲突
 import torch
 import torch.nn.functional as F
 import math
@@ -305,7 +306,7 @@ def _transform_key(generator, n, vocab_size):
 def _transform_sample(probs, pi, xi):
     """逆变换采样: CDF(permuted_probs) → searchsorted(xi) → pi映射"""
     cdf = torch.cumsum(probs.gather(1, pi.unsqueeze(0).expand(probs.shape[0], -1)), dim=1)
-    idx = torch.searchsorted(cdf, xi.unsqueeze(0).expand(probs.shape[0], -1, -1))
+    idx = torch.searchsorted(cdf, xi.view(1, 1))
     return pi[idx.clamp(0, cdf.shape[1] - 1).squeeze(-1)].unsqueeze(-1)
 
 
@@ -365,8 +366,8 @@ def _wm_get_seed(token_ids, salt_key=35317, seed=0, hash_size=2**64-1):
     """n-gram哈希种子 — 对齐 models/wm.py get_seed_rng ('hash')"""
     s = seed
     for t in token_ids:
-        s = int(np.mod(s * salt_key + int(t), hash_size))
-    return s
+        s = (s * salt_key + int(t)) % hash_size
+    return int(s)
 
 
 def _wm_score_tok(ngram_tokens, rng):
