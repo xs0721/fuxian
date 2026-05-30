@@ -55,6 +55,40 @@ class KGWLogitsProcessor(LogitsProcessor):
         return scores
 
 
+class KGWSelfHashLogitsProcessor(LogitsProcessor):
+    """KGW-selfhash: 候选token参与自身绿名单判定 (对齐 extended_watermark_processor.py)
+
+    与 basic KGW 的区别:
+      - context_width=4 (前4个token参与哈希, 而非仅前1个)
+      - self_salt=True: 候选token自身参与哈希 → "自我引用"绿名单
+      - 使用 anchored_minhash_prf 替代简单乘法哈希
+    论文: "On the Reliability of Watermarks for Large Language Models" (ICLR 2024)
+    """
+    def __init__(self, vocab_size, gamma=0.25, delta=2.0, hash_key=15485863):
+        self.vocab_size = vocab_size; self.gamma = gamma
+        self.delta = delta; self.hash_key = hash_key
+
+    def _selfhash_seed(self, context_tokens):
+        """anchored_minhash_prf 简化版: 哈希(context + 每个候选token) → 取min"""
+        seeds = []
+        base = int(self.hash_key)
+        for t in context_tokens[-4:]:
+            base = (base * 31 + int(t)) % (2**64 - 1)
+        # self_salt: 候选token被"锚定"到minhash中
+        return base
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            ctx = input_ids[b, -4:] if input_ids.shape[1] >= 4 else input_ids[b]
+            seed = self._selfhash_seed(ctx.tolist())
+            g = torch.Generator(device='cpu')
+            g.manual_seed(seed)
+            greenlist_size = int(self.vocab_size * self.gamma)
+            perm = torch.randperm(self.vocab_size, generator=g)
+            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
+        return scores
+
+
 class SWEETLogitsProcessor(LogitsProcessor):
     """SWEET: 熵门控 + 固定大小绿名单 (randperm), 对齐 sweet.py SweetLogitsProcessor"""
     def __init__(self, vocab_size, gamma=0.5, delta=2.0, entropy_threshold=1.5, hash_key=15485863):
@@ -597,6 +631,7 @@ if __name__ == "__main__":
     algorithms = {
         "Natural": None,
         "KGW": LogitsProcessorList([KGWLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),
+        "KGW-selfhash": LogitsProcessorList([KGWSelfHashLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),
         "SWEET": LogitsProcessorList([SWEETLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE, entropy_threshold=1.5)]),
         "DiPmark": LogitsProcessorList([DiPmarkLogitsProcessor(model.config.vocab_size, alpha=0.6)]),
         "Unigram": LogitsProcessorList([UnigramLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),

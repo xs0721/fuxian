@@ -34,6 +34,8 @@ TEST_SCRIPTS = {
     "15": "test15_api_query_attack.py",
     "16": "test16_robustness_spoofing.py",
     "17": "test17_watermark_learnability.py",
+    "18": "test18_publicly_detectable.py",
+    "19": "test19_unforgeable_watermark.py",
 }
 
 def run_test(num):
