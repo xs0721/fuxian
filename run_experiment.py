@@ -12,7 +12,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessor, L
 # ================= ===================================
 CACHE_DIR = "E:/Your_Cloud_Drive/hf_cache"
 MODEL_NAME = "facebook/opt-125m"
-TEST_SAMPLE_SIZE = 200  # 正式实验时直接在这里修改为 100 或 200
+TEST_SAMPLE_SIZE = 5  # 快速测试用, 正式实验改为 200
 DELTA_VALUE = 2.0
 PROMPT_LENGTH = 30
 GENERATE_LENGTH = 50
@@ -770,7 +770,7 @@ if __name__ == "__main__":
                     prompt_text = tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)
                     texts = generate_watermax(
                         model, tokenizer, [prompt_text], GENERATE_LENGTH,
-                        num_seq=3, n_splits=2, ngram=3, seed=seed, device=device)
+                        num_seq=2, n_splits=1, ngram=3, seed=seed, device=device)
                     text = texts[0]
                     _WATERMAX_STATE[text] = {'ngram': 3, 'split_len': GENERATE_LENGTH // 2, 'seed': seed}
                 else:
