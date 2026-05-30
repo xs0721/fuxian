@@ -411,7 +411,7 @@ def generate_watermax(model, tokenizer, prompts, max_gen_len, num_seq=3,
     for k in range(n_splits):
         inputs = tokenizer(res_texts, return_tensors='pt', padding=True,
                            truncation=True, add_special_tokens=False).to(device)
-        input_lens = [len(np.array(p)[np.argwhere(np.array(p) != tokenizer.eos_token_id)[0][0]:])
+        input_lens = [len(p[p != tokenizer.eos_token_id])
                       for p in inputs['input_ids'].cpu()]
 
         gen_len = split_len if k < n_splits - 1 else split_len - ngram + 1
