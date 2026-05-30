@@ -325,18 +325,21 @@ def watermark_stealing_attack(text, algo_name, attack_type, tokenizer, vocab_siz
     for i in range(1, len(tokens)):
         prev = tokens[i-1]
         curr = tokens[i]
-        torch.manual_seed(secret_key * prev if algo_name in ["KGW", "SWEET", "DiPmark"] else 42)
-        green_mask = (torch.rand(vocab_size) < gamma)
-        is_green = green_mask[curr].item()
+        g = torch.Generator(device='cpu')
+        g.manual_seed(secret_key * prev if algo_name in ["KGW", "SWEET", "DiPmark"] else 42)
+        greenlist_size = int(vocab_size * gamma)
+        vocab_permutation = torch.randperm(vocab_size, generator=g)
+        greenlist = set(vocab_permutation[:greenlist_size].tolist())
+        is_green = curr in greenlist
 
         if attack_type == "scrubbing" and is_green and random.random() < 0.6:
             candidate = (curr + random.randint(1, 100)) % vocab_size
-            while green_mask[candidate].item():
+            while candidate in greenlist:
                 candidate = (candidate + 1) % vocab_size
             tampered_tokens.append(candidate)
         elif attack_type == "spoofing" and not is_green and random.random() < 0.6:
             candidate = (curr + random.randint(1, 100)) % vocab_size
-            while not green_mask[candidate].item():
+            while candidate not in greenlist:
                 candidate = (candidate + 1) % vocab_size
             tampered_tokens.append(candidate)
         else:
@@ -451,26 +454,99 @@ def sira_t5_infilling(masked_text, reference_text=None):
     return final_text.replace("  ", " ").strip()
 
 # ================= 检测器 =================
-def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_key=15485863):
+def detect_sweet(text, model, tokenizer, vocab_size, gamma=0.5,
+                 entropy_threshold=1.5, secret_key=15485863, device="cuda"):
+    """SWEET 熵感知检测器 — 对齐 sweet.py SweetDetector._score_sequence
+
+    核心差异 vs KGW:
+      1. 用模型逐token计算熵 (一次前向传播)
+      2. 排除低熵token (e ≤ entropy_threshold) — 不计入T, 不统计green_count
+      3. z = (green_count - γ×T_scored) / sqrt(T_scored×γ×(1-γ))
+      4. 若 scored_tokens<1 → 返回 -100 (视为人类生成)
+    """
+    if not isinstance(text, str) or len(text.strip()) == 0:
+        return -100.0
+    tokens = tokenizer.encode(text, return_tensors="pt")[0]
+    T = len(tokens) - 1
+    if T <= 0:
+        return -100.0
+
+    # 逐token熵 (对齐 lm_eval/utils.py calculate_entropy + evaluator.py)
+    with torch.no_grad():
+        input_ids = tokens.unsqueeze(0).to(device)
+        outputs = model(input_ids)
+        logits = outputs.logits[0]
+        probs = torch.softmax(logits, dim=-1)
+        ent = -torch.where(probs > 0, probs * probs.log(),
+                           torch.tensor(0.0, device=device)).sum(dim=-1)
+    entropy = ent.cpu().tolist()
+    # 右移: 位置i的熵预测token_{i+1}, 前缀处填0
+    entropy = [0.0] + entropy[:-1]
+
+    green_count = 0
+    scored_tokens = 0
+    for i in range(1, len(tokens)):
+        e = entropy[i]
+        if e <= entropy_threshold:
+            continue
+        scored_tokens += 1
+
+        g = torch.Generator(device='cpu')
+        g.manual_seed(secret_key * tokens[i - 1].item())
+        greenlist_size = int(vocab_size * gamma)
+        vocab_permutation = torch.randperm(vocab_size, generator=g)
+        greenlist = vocab_permutation[:greenlist_size]
+        if tokens[i] in greenlist:
+            green_count += 1
+
+    if scored_tokens < 1:
+        return -100.0
+
+    expected = gamma * scored_tokens
+    variance = scored_tokens * gamma * (1 - gamma)
+    return (green_count - expected) / math.sqrt(variance) if variance > 0 else 0.0
+
+
+def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5,
+                     secret_key=15485863, model=None, device="cuda"):
+    """统一检测入口 — 按算法路由
+
+    model 和 device 参数仅对 SWEET 必须 (需要模型计算每token熵).
+    其他算法忽略这两个参数.
+    """
     if algo_name == "Natural": return 0.0
     tokens = tokenizer.encode(text, return_tensors="pt")[0]
     total_tokens = len(tokens) - 1
     if total_tokens <= 0: return 0.0
     green_tokens_count = 0
 
-    if algo_name in ["KGW", "SWEET", "DiPmark"]:
+    if algo_name == "SWEET":
+        if model is None:
+            load_detector()
+            model = target_model
+        return detect_sweet(text, model, tokenizer, vocab_size,
+                            gamma=gamma, secret_key=secret_key, device=device)
+
+    elif algo_name in ["KGW", "DiPmark"]:
         for i in range(1, len(tokens)):
-            torch.manual_seed(secret_key * tokens[i - 1].item())
-            if (torch.rand(vocab_size) < gamma)[tokens[i].item()]:
+            g = torch.Generator(device='cpu')
+            g.manual_seed(secret_key * tokens[i - 1].item())
+            greenlist_size = int(vocab_size * gamma)
+            vocab_permutation = torch.randperm(vocab_size, generator=g)
+            greenlist = vocab_permutation[:greenlist_size]
+            if tokens[i] in greenlist:
                 green_tokens_count += 1
         variance = total_tokens * gamma * (1 - gamma)
         return (green_tokens_count - (total_tokens * gamma)) / math.sqrt(variance) if variance > 0 else 0.0
 
     elif algo_name == "Unigram":
-        torch.manual_seed(42)
-        green_mask = (torch.rand(vocab_size) < gamma)
+        g = torch.Generator(device='cpu')
+        g.manual_seed(42)
+        greenlist_size = int(vocab_size * gamma)
+        vocab_permutation = torch.randperm(vocab_size, generator=g)
+        greenlist = set(vocab_permutation[:greenlist_size].tolist())
         for i in range(1, len(tokens)):
-            if green_mask[tokens[i].item()]:
+            if tokens[i].item() in greenlist:
                 green_tokens_count += 1
         variance = total_tokens * gamma * (1 - gamma)
         return (green_tokens_count - (total_tokens * gamma)) / math.sqrt(variance) if variance > 0 else 0.0
@@ -499,7 +575,8 @@ algorithms = [col.replace("Text_", "") for col in df.columns if col.startswith("
 print(f"目标算法: {algorithms}")
 
 sns.set_theme(style="whitegrid", palette="deep")
-plt.rcParams['font.sans-serif'] = ['Arial']
+plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial']
+plt.rcParams['axes.unicode_minus'] = False
 
 def print_table(df, title=""):
     """打印 DataFrame，自动处理 tabulate 缺失"""

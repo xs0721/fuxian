@@ -9,7 +9,7 @@ load_attacker()  # SIRA Stage 1 + Stage 3 需要 T5
 
 # ── LogitsProcessor ────────────────────────────────
 class KGWLogitsProcessor(LogitsProcessor):
-    """KGW 标准硬二元绿名单 — 使用独立 Generator 避免污染全局 RNG"""
+    """KGW 标准硬二元绿名单 — randperm固定大小 + 独立Generator"""
     def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
         self.vocab_size = vocab_size
         self.gamma = gamma
@@ -20,8 +20,10 @@ class KGWLogitsProcessor(LogitsProcessor):
         for b in range(input_ids.shape[0]):
             g = torch.Generator(device='cpu')
             g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            green_mask = torch.rand(self.vocab_size, generator=g) < self.gamma
-            scores[b, green_mask.to(scores.device)] += self.delta
+            greenlist_size = int(self.vocab_size * self.gamma)
+            vocab_permutation = torch.randperm(self.vocab_size, generator=g)
+            greenlist_ids = vocab_permutation[:greenlist_size]
+            scores[b, greenlist_ids.to(scores.device)] += self.delta
         return scores
 
 

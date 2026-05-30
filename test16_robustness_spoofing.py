@@ -149,7 +149,7 @@ summary_rb = df_rb.groupby('Method').agg(
     Avg_Inserts=('Toxic_Inserts', 'mean'),
 ).round(3)
 summary_rb['Still Detected?'] = summary_rb['Z_Mean'].apply(
-    lambda x: '✓ 可检测 (>4)' if x >= 4.0 else '✗ 绕过检测'
+    lambda x: 'YES (>4)' if x >= 4.0 else 'NO  (<4)'
 )
 
 print(f"\n=== [数据表] 鲁棒性利用伪造 (Toxic Insert + Content Modify) ===")

@@ -36,6 +36,7 @@ model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, cache_dir=CACHE_DIR).to
 # 2. 水印算法模块
 # ================= ===================================
 class KGWLogitsProcessor(LogitsProcessor):
+    """KGW: 固定大小绿名单 (randperm) + Generator 对象, 对齐 watermark.py WatermarkBase"""
     def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
         self.vocab_size = vocab_size
         self.gamma = gamma
@@ -44,12 +45,17 @@ class KGWLogitsProcessor(LogitsProcessor):
 
     def __call__(self, input_ids, scores):
         for b in range(input_ids.shape[0]):
-            torch.manual_seed(self.hash_key * input_ids[b, -1].item())
-            scores[b, torch.rand(self.vocab_size) < self.gamma] += self.delta
+            g = torch.Generator(device='cpu')
+            g.manual_seed(self.hash_key * input_ids[b, -1].item())
+            greenlist_size = int(self.vocab_size * self.gamma)
+            vocab_permutation = torch.randperm(self.vocab_size, generator=g)
+            greenlist_ids = vocab_permutation[:greenlist_size]
+            scores[b, greenlist_ids.to(scores.device)] += self.delta
         return scores
 
 
 class SWEETLogitsProcessor(LogitsProcessor):
+    """SWEET: 熵门控 + 固定大小绿名单 (randperm), 对齐 sweet.py SweetLogitsProcessor"""
     def __init__(self, vocab_size, gamma=0.5, delta=2.0, entropy_threshold=1.5, hash_key=15485863):
         self.vocab_size = vocab_size
         self.gamma = gamma
@@ -59,10 +65,17 @@ class SWEETLogitsProcessor(LogitsProcessor):
 
     def __call__(self, input_ids, scores):
         for b in range(input_ids.shape[0]):
-            entropy = -torch.sum(F.softmax(scores[b], dim=-1) * torch.log(F.softmax(scores[b], dim=-1) + 1e-8))
-            if entropy >= self.entropy_threshold:
-                torch.manual_seed(self.hash_key * input_ids[b, -1].item())
-                scores[b, torch.rand(self.vocab_size) < self.gamma] += self.delta
+            raw_probs = torch.softmax(scores[b], dim=-1)
+            ent = -torch.where(raw_probs > 0,
+                               raw_probs * raw_probs.log(),
+                               torch.tensor(0.0, device=scores.device)).sum()
+            if ent >= self.entropy_threshold:
+                g = torch.Generator(device='cpu')
+                g.manual_seed(self.hash_key * input_ids[b, -1].item())
+                greenlist_size = int(self.vocab_size * self.gamma)
+                vocab_permutation = torch.randperm(self.vocab_size, generator=g)
+                greenlist_ids = vocab_permutation[:greenlist_size]
+                scores[b, greenlist_ids.to(scores.device)] += self.delta
         return scores
 
 
