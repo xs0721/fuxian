@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import math
-import mplcursors 
+import mplcursors
 import os
 import pandas as pd
 import numpy as np
@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 from datasets import load_dataset
+from scipy.stats import norm, gamma  # WaterMax p-value
 from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessor, LogitsProcessorList
 
 # ================= ===================================
@@ -259,6 +260,137 @@ def detect_transform(text, tokenizer, vocab_size, xi, pi, offset, seed, n_runs=2
     return (null_scores.mean().item() - test_score) / null_scores.std().item() if null_scores.std() > 0 else 0.0
 
 
+# ── WaterMax 水印 (draft-based, 非LogitsProcessor) ──
+def _wm_get_seed(token_ids, salt_key=35317, seed=0, hash_size=2**64-1):
+    """n-gram哈希种子 — 对齐 models/wm.py get_seed_rng ('hash')"""
+    s = seed
+    for t in token_ids:
+        s = int(np.mod(s * salt_key + int(t), hash_size))
+    return s
+
+
+def _wm_score_tok(ngram_tokens, rng):
+    """单个n-gram的评分: N(0,1)随机变量 — 对齐 score_tok()"""
+    seed = _wm_get_seed(ngram_tokens)
+    rng.bit_generator.state = type(rng.bit_generator)(seed).state
+    return rng.standard_normal()
+
+
+def _wm_score_draft(output_tokens, start_pos, ngram, seen_ngrams, rng):
+    """对单份草稿评分: sum(N(0,1))/sqrt(count) — 对齐 scoring_outputs()"""
+    Xagg = 0.0; count = 0
+    for jj in range(start_pos, len(output_tokens)):
+        ngram_w = tuple(output_tokens[jj - ngram + 1:jj + 1]) if jj >= ngram - 1 else None
+        if ngram_w is None or ngram_w in seen_ngrams:
+            continue
+        seen_ngrams.add(ngram_w)
+        Xagg += _wm_score_tok(list(ngram_w), rng)
+        count += 1
+    return Xagg / np.sqrt(count) if count > 0 else -np.inf
+
+
+def generate_watermax(model, tokenizer, prompts, max_gen_len, num_seq=3,
+                       n_splits=2, ngram=3, seed=0, salt_key=35317, device="cuda"):
+    """WaterMax 水印生成 — 草稿选择 (对齐 NewRobustWmSentenceGenerator.generate)"""
+    prompts = [prompts] if isinstance(prompts, str) else prompts
+    rng = np.random.default_rng(seed)
+    split_len = max_gen_len // n_splits
+    res_texts = list(prompts)
+
+    # 先生成前 ngram-1 个自由token (这些不会被检测器评分)
+    if ngram > 1:
+        inputs = tokenizer(res_texts, return_tensors='pt', padding=True,
+                           truncation=True, add_special_tokens=False).to(device)
+        h_out = model.generate(**inputs, max_new_tokens=ngram - 1, do_sample=True,
+                                temperature=0.85, num_beams=1)
+        res_texts = tokenizer.batch_decode(h_out, skip_special_tokens=True)
+
+    all_seen = [set() for _ in range(len(prompts) * num_seq)]
+
+    for k in range(n_splits):
+        inputs = tokenizer(res_texts, return_tensors='pt', padding=True,
+                           truncation=True, add_special_tokens=False).to(device)
+        input_lens = [len(np.array(p)[np.argwhere(np.array(p) != tokenizer.eos_token_id)[0][0]:])
+                      for p in inputs['input_ids'].cpu()]
+
+        gen_len = split_len if k < n_splits - 1 else split_len - ngram + 1
+        if gen_len <= 0: gen_len = 1
+
+        outputs = model.generate(**inputs, max_new_tokens=gen_len, do_sample=True,
+                                  temperature=0.85, num_beams=1,
+                                  num_return_sequences=num_seq)
+
+        # Decode → re-encode (对齐原版, 消除特殊token合并问题)
+        decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+        re_encoded = tokenizer(decoded, add_special_tokens=False)['input_ids']
+
+        # 评分 → 选最优草稿
+        best_texts = []
+        for b in range(len(prompts)):
+            best_score = -np.inf; best_draft = decoded[b * num_seq]
+            for s in range(num_seq):
+                idx = b * num_seq + s
+                if tokenizer.eos_token_id in outputs[idx][input_lens[b]:]:
+                    score = np.nan
+                else:
+                    score = _wm_score_draft(re_encoded[idx], input_lens[b],
+                                             ngram, all_seen[idx], rng)
+                if not np.isnan(score) and score > best_score:
+                    best_score = score; best_draft = decoded[idx]
+            best_texts.append(best_draft)
+        res_texts = best_texts
+
+    return res_texts
+
+
+def detect_watermax(text, tokenizer, ngram=3, split_len=None,
+                     salt_key=35317, seed=0):
+    """WaterMax 检测 — 逐块高斯评分 + Gamma CDF p值 → z-score"""
+    tokens = tokenizer.encode(text, add_special_tokens=False)
+    total_len = len(tokens)
+    if split_len is None: split_len = total_len
+    if total_len < ngram: return 0.0
+
+    rng = np.random.default_rng(seed)
+    all_scores = []
+    n_splits = total_len // split_len
+
+    for cur_split in range(n_splits + 1):
+        ct = tokens[ngram - 1:][split_len * cur_split:split_len * (cur_split + 1)]
+        cur_size = min(split_len, len(ct))
+        if cur_size == 0: continue
+
+        rt = []
+        seen = set()
+        for pos in range(cur_size):
+            if pos < ngram - 1 and cur_split > 0:
+                prev = tokens[ngram - 1:][split_len * (cur_split - 1):split_len * cur_split]
+                ngram_tokens = prev[-ngram + pos + 1:] + ct[:pos + 1]
+            elif pos >= ngram - 1:
+                ngram_tokens = ct[pos - ngram + 1:pos + 1]
+            else:
+                ngram_tokens = tokens[:ngram - 1][-ngram + pos + 1:] + ct[:pos + 1]
+
+            tup = tuple(ngram_tokens)
+            if tup not in seen:
+                seen.add(tup)
+                rt.append(_wm_score_tok(list(ngram_tokens), rng))
+
+        if len(rt) > 0:
+            all_scores.append(np.nansum(rt) / np.sqrt(len(rt)))
+
+    if not all_scores: return 0.0
+
+    # Gamma CDF p-value → z-score (Fisher-like aggregation)
+    pvalue = gamma.cdf(-np.nansum(norm.logcdf(all_scores)), a=np.sum(~np.isnan(all_scores)))
+    pvalue = max(pvalue, 1e-300)
+    # Convert p-value to z-score
+    return float(-norm.ppf(pvalue))
+
+
+# ── WaterMax 状态缓存 ──
+_WATERMAX_STATE = {}
+
 # ── 水印生成/检测缓存 (用于Gumbel/Transform的状态) ──
 _GUMBEL_STATE = {}
 _TRANSFORM_STATE = {}
@@ -285,6 +417,12 @@ def detect_watermark(text, algo_name, tokenizer, vocab_size, gamma=0.5, secret_k
         state = _TRANSFORM_STATE.get(text, {})
         if not state: return 0.0
         return detect_transform(text, tokenizer, vocab_size, state['xi'], state['pi'], state['offset'], state['seed'])
+
+    if algo_name == "WaterMax":
+        state = _WATERMAX_STATE.get(text, {})
+        if not state: return 0.0
+        return detect_watermax(text, tokenizer, ngram=state.get('ngram', 3),
+                                split_len=state.get('split_len'), seed=state.get('seed', 0))
 
     # 雷达 A：前缀哈希检测器 (加入 DiPmark)
     if algo_name in ["KGW", "SWEET", "DiPmark"]:
@@ -463,8 +601,9 @@ if __name__ == "__main__":
         "DiPmark": LogitsProcessorList([DiPmarkLogitsProcessor(model.config.vocab_size, alpha=0.6)]),
         "Unigram": LogitsProcessorList([UnigramLogitsProcessor(model.config.vocab_size, delta=DELTA_VALUE)]),
         "SemStamp": LogitsProcessorList([SemStampLogitsProcessor(tokenizer)]),
-        "Gumbel": "GUMBEL",   # 自定义采样 (非LogitsProcessor)
+        "Gumbel": "GUMBEL",     # 自定义采样 (非LogitsProcessor)
         "Transform": "TRANSFORM",  # 自定义采样 (非LogitsProcessor)
+        "WaterMax": "WATERMAX",  # 草稿选择 (非LogitsProcessor)
     }
 
     results = []
@@ -512,6 +651,13 @@ if __name__ == "__main__":
                         GENERATE_LENGTH, seed, model.config.vocab_size, device)
                     text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
                     _TRANSFORM_STATE[text] = {'xi': xi, 'pi': pi, 'offset': offset, 'seed': seed}
+                elif algo_name == "WaterMax":
+                    prompt_text = tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)
+                    texts = generate_watermax(
+                        model, tokenizer, [prompt_text], GENERATE_LENGTH,
+                        num_seq=3, n_splits=2, ngram=3, seed=seed, device=device)
+                    text = texts[0]
+                    _WATERMAX_STATE[text] = {'ngram': 3, 'split_len': GENERATE_LENGTH // 2, 'seed': seed}
                 else:
                     generate_kwargs = {**inputs, "max_new_tokens": GENERATE_LENGTH, "do_sample": True, "temperature": 0.7}
                     if processor is not None:
