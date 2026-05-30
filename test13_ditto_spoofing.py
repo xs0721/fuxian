@@ -8,24 +8,6 @@ print_test_header("DITTO 水印伪造 (EWS提取 + 无密钥栽赃 vs 随机生�
 
 load_attacker()
 
-
-# ── KGW LogitsProcessor ────────────────────────────
-class KGWLogitsProcessor(LogitsProcessor):
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
-        self.vocab_size = vocab_size; self.gamma = gamma
-        self.delta = delta; self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            greenlist_size = int(self.vocab_size * self.gamma)
-            vocab_permutation = torch.randperm(self.vocab_size, generator=g)
-            greenlist_ids = vocab_permutation[:greenlist_size]
-            scores[b, greenlist_ids.to(scores.device)] += self.delta
-        return scores
-
-
 # ── DITTO 阶段1: "知识蒸馏" — 从水印文本收集token统计 ──
 def _ditto_collect_statistics(model, tokenizer, prompts, max_new=80, delta=2.0,
                                hash_key=15485863, device="cuda"):

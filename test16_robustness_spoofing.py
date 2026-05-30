@@ -6,23 +6,6 @@ print_test_header("鲁棒性利用伪造 (Robustness Spoofing) — NeurIPS 2024 
 
 load_attacker()  # T5 用于内容修改模拟
 
-
-# ── KGW LogitsProcessor ────────────────────────────
-class KGWLogitsProcessor(LogitsProcessor):
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
-        self.vocab_size = vocab_size; self.gamma = gamma
-        self.delta = delta; self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            greenlist_size = int(self.vocab_size * self.gamma)
-            perm = torch.randperm(self.vocab_size, generator=g)
-            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
-        return scores
-
-
 # ── 攻击1: 有毒词插入 ──────────────────────────────
 # 对齐 attack_robustness.py insert_banned_words
 BANNED_WORDS = [

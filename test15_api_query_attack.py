@@ -6,23 +6,6 @@ print_test_header("检测API查询攻击 (Public API Query) — NeurIPS 2024 No 
 
 load_detector()
 
-
-# ── KGW LogitsProcessor ────────────────────────────
-class KGWLogitsProcessor(LogitsProcessor):
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
-        self.vocab_size = vocab_size; self.gamma = gamma
-        self.delta = delta; self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            greenlist_size = int(self.vocab_size * self.gamma)
-            perm = torch.randperm(self.vocab_size, generator=g)
-            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
-        return scores
-
-
 # ── API查询攻击核心 ────────────────────────────────
 def _api_query_generate(model, tokenizer, prompt, detector_fn, max_new=60,
                          top_k=10, mode="removal", device="cuda"):

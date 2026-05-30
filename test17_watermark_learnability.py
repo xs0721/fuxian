@@ -8,22 +8,6 @@ print_test_header("水印可学习性 (Learnability) — Logit蒸馏使Student�
 
 load_detector()
 
-# ── KGW LogitsProcessor ────────────────────────────
-class KGWLogitsProcessor(LogitsProcessor):
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
-        self.vocab_size = vocab_size; self.gamma = gamma
-        self.delta = delta; self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            greenlist_size = int(self.vocab_size * self.gamma)
-            perm = torch.randperm(self.vocab_size, generator=g)
-            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
-        return scores
-
-
 # ── 水印Logit蒸馏核心 ──────────────────────────────
 def _watermark_logits(model, input_ids, attention_mask, kgw_processor, device):
     """对输入文本的每个位置施加KGW水印, 返回水印化后的logits

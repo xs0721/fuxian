@@ -38,6 +38,24 @@ GEMMA_DIR = "E:/Your_Cloud_Drive/hf_cache/LLM-Research/gemma-2-2b-it"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 vocab_size = 50272
 
+
+# ================= 共享水印处理器 =================
+class KGWLogitsProcessor(LogitsProcessor):
+    """KGW 标准水印: randperm固定大小绿名单 + 独立Generator"""
+    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
+        self.vocab_size = vocab_size; self.gamma = gamma
+        self.delta = delta; self.hash_key = hash_key
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            g = torch.Generator(device='cpu')
+            g.manual_seed(self.hash_key * input_ids[b, -1].item())
+            greenlist_size = int(self.vocab_size * self.gamma)
+            perm = torch.randperm(self.vocab_size, generator=g)
+            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
+        return scores
+
+
 # ================= 懒加载模型 =================
 _models_loaded = {
     "detector": False, "attacker": False, "translation": False

@@ -8,26 +8,6 @@ print_test_header("De-mark 水印移除 (Token级对抗性去偏 vs T5改写)")
 
 load_attacker()  # T5 用于对比
 
-
-# ── KGW LogitsProcessor ────────────────────────────
-class KGWLogitsProcessor(LogitsProcessor):
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
-        self.vocab_size = vocab_size
-        self.gamma = gamma
-        self.delta = delta
-        self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            greenlist_size = int(self.vocab_size * self.gamma)
-            vocab_permutation = torch.randperm(self.vocab_size, generator=g)
-            greenlist_ids = vocab_permutation[:greenlist_size]
-            scores[b, greenlist_ids.to(scores.device)] += self.delta
-        return scores
-
-
 # ── De-mark 核心组件 ───────────────────────────────
 def _ngram_red_green_list(context_tokens, vocab_size, device, hash_key=15485863):
     """KGW 绿名单生成 — 与 run_experiment.py 一致"""

@@ -4,23 +4,6 @@ import math
 
 print_test_header("多密钥水印稀释 (Multiple Keys Removal) — NeurIPS 2024 No Free Lunch")
 
-
-# ── KGW LogitsProcessor ────────────────────────────
-class KGWLogitsProcessor(LogitsProcessor):
-    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
-        self.vocab_size = vocab_size; self.gamma = gamma
-        self.delta = delta; self.hash_key = hash_key
-
-    def __call__(self, input_ids, scores):
-        for b in range(input_ids.shape[0]):
-            g = torch.Generator(device='cpu')
-            g.manual_seed(self.hash_key * input_ids[b, -1].item())
-            greenlist_size = int(self.vocab_size * self.gamma)
-            perm = torch.randperm(self.vocab_size, generator=g)
-            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
-        return scores
-
-
 # ── 多密钥 LogitsProcessor ────────────────────────
 class MultiKeyLogitsProcessor(LogitsProcessor):
     """对齐 LLM-Watermark-Attacks watermark_processor.py WatermarkLogitsProcessor
