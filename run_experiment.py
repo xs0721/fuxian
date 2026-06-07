@@ -585,7 +585,11 @@ def _transform_key(generator, n, vocab_size):
 
 def _transform_sample(probs, pi, xi):
     """逆变换采样: CDF(permuted_probs) → searchsorted(xi) → pi映射"""
-    cdf = torch.cumsum(probs.gather(1, pi.unsqueeze(0).expand(probs.shape[0], -1)), dim=1)
+    # 兼容PyTorch 2.1.x：cumsum在CPU上不支持Half类型
+    gathered = probs.gather(1, pi.unsqueeze(0).expand(probs.shape[0], -1))
+    if gathered.dtype == torch.float16 and gathered.device.type == 'cpu':
+        gathered = gathered.float()
+    cdf = torch.cumsum(gathered, dim=1)
     idx = torch.searchsorted(cdf, xi.view(1, 1))
     return pi[idx.clamp(0, cdf.shape[1] - 1).squeeze(-1)].unsqueeze(-1)
 
