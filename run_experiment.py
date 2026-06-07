@@ -203,9 +203,10 @@ class _UPVNet(torch.nn.Module):
         self.net = torch.nn.Sequential(
             torch.nn.Linear(context_len, hidden), torch.nn.ReLU(),
             torch.nn.Linear(hidden, 1), torch.nn.Sigmoid())
-        g = torch.Generator(); g.manual_seed(42)
+        # 兼容PyTorch 2.1.x：uniform_不支持generator参数
+        torch.manual_seed(42)
         for p in self.net.parameters():
-            torch.nn.init.uniform_(p, -0.5, 0.5, generator=g)
+            torch.nn.init.uniform_(p, -0.5, 0.5)
 
     def forward(self, ctx):
         return self.net(ctx.float().unsqueeze(0) / 50272.0).squeeze()
