@@ -99,3 +99,57 @@ print("\n重要提示:")
 print("  ⚠️  ICW依赖模型对指令的遵循能力")
 print("  ⚠️  小模型（OPT-125m）可能效果有限")
 print("  ✅ 论文使用GPT-4等大模型效果更好")
+
+# ============================================================================
+# 可视化
+# ============================================================================
+print("\n" + "=" * 80)
+print("📊 生成可视化...")
+print("=" * 80)
+
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+# 图1: ICW Initials检测结果
+labels1 = ['Watermarked\nText', 'Human\nText']
+scores1 = [z_watermarked_initials, z_human_initials]
+colors1 = ['#2ecc71', '#e74c3c']
+
+bars1 = ax1.bar(labels1, scores1, color=colors1, alpha=0.8, edgecolor='black', linewidth=2)
+ax1.set_ylabel('Z-Score', fontsize=13, fontweight='bold')
+ax1.set_title('ICW Initials Detection', fontsize=15, fontweight='bold', pad=15)
+ax1.axhline(y=4.0, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Safe Threshold')
+ax1.grid(axis='y', alpha=0.3, linestyle='--')
+ax1.legend(fontsize=10)
+
+for bar, score in zip(bars1, scores1):
+    height = bar.get_height()
+    ax1.text(bar.get_x() + bar.get_width()/2., height,
+            f'{score:.2f}', ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+# 图2: ICW Lexical检测结果
+labels2 = ['Watermarked\nText', 'Human\nText']
+scores2 = [z_watermarked_lexical, z_human_lexical]
+colors2 = ['#3498db', '#e67e22']
+
+bars2 = ax2.bar(labels2, scores2, color=colors2, alpha=0.8, edgecolor='black', linewidth=2)
+ax2.set_ylabel('Z-Score', fontsize=13, fontweight='bold')
+ax2.set_title('ICW Lexical Detection', fontsize=15, fontweight='bold', pad=15)
+ax2.axhline(y=4.0, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Safe Threshold')
+ax2.grid(axis='y', alpha=0.3, linestyle='--')
+ax2.legend(fontsize=10)
+
+for bar, score in zip(bars2, scores2):
+    height = bar.get_height()
+    ax2.text(bar.get_x() + bar.get_width()/2., height,
+            f'{score:.2f}', ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+plt.tight_layout()
+output_file = 'icw_quick_test.png'
+plt.savefig(output_file, dpi=300, bbox_inches='tight')
+print(f"✅ 可视化已保存: {output_file}")
+plt.close()

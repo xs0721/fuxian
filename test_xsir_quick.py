@@ -105,3 +105,62 @@ print("  # 检测")
 print("  z_score = detect_watermark(text, 'X-SIR', tokenizer, vocab_size)")
 print("\n完整测试:")
 print("  python test22_xsir_consistency.py")
+
+# ============================================================================
+# 可视化
+# ============================================================================
+print("\n" + "=" * 80)
+print("📊 生成可视化...")
+print("=" * 80)
+
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+# 图1: X-SIR检测结果
+labels = list(detection_results.keys())
+scores = list(detection_results.values())
+colors = ['#2ecc71', '#3498db', '#e74c3c']
+
+bars1 = ax1.bar(range(len(labels)), scores, color=colors, alpha=0.8, edgecolor='black', linewidth=2)
+ax1.set_ylabel('Z-Score', fontsize=13, fontweight='bold')
+ax1.set_title('X-SIR Detection Results', fontsize=15, fontweight='bold', pad=15)
+ax1.set_xticks(range(len(labels)))
+ax1.set_xticklabels(['Original\nText', 'Paraphrase 1\n(Semantic)', 'Paraphrase 2\n(Different)'], fontsize=10)
+ax1.axhline(y=4.0, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Safe Threshold')
+ax1.grid(axis='y', alpha=0.3, linestyle='--')
+ax1.legend(fontsize=10)
+
+for bar, score in zip(bars1, scores):
+    height = bar.get_height()
+    ax1.text(bar.get_x() + bar.get_width()/2., height,
+            f'{score:.2f}', ha='center', va='bottom', fontsize=11, fontweight='bold')
+
+# 图2: 鲁棒性对比
+robustness_data = {
+    'Same Hash\n(Robust)': 1 if hash1 == hash2 else 0,
+    'Different Hash\n(Not Robust)': 0 if hash1 == hash2 else 1
+}
+colors2 = ['#27ae60' if hash1 == hash2 else '#95a5a6', '#e74c3c' if hash1 != hash2 else '#95a5a6']
+
+bars2 = ax2.bar(robustness_data.keys(), robustness_data.values(), color=colors2, alpha=0.8, edgecolor='black', linewidth=2)
+ax2.set_ylabel('Status', fontsize=13, fontweight='bold')
+ax2.set_title('X-SIR Robustness (Token Order Invariance)', fontsize=15, fontweight='bold', pad=15)
+ax2.set_ylim([0, 1.2])
+ax2.set_yticks([0, 1])
+ax2.set_yticklabels(['No', 'Yes'])
+ax2.grid(axis='y', alpha=0.3, linestyle='--')
+
+# 添加说明
+result_text = '✓ Robust' if hash1 == hash2 else '✗ Not Robust'
+ax2.text(0.5, 0.5, result_text, ha='center', va='center', fontsize=16, fontweight='bold',
+         transform=ax2.transAxes, color='green' if hash1 == hash2 else 'red')
+
+plt.tight_layout()
+output_file = 'xsir_quick_test.png'
+plt.savefig(output_file, dpi=300, bbox_inches='tight')
+print(f"✅ 可视化已保存: {output_file}")
+plt.close()

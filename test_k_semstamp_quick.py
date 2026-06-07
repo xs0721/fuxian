@@ -134,3 +134,42 @@ print("\nk-SemStamp vs SemStamp:")
 print("  • SemStamp: 单一语义空间")
 print("  • k-SemStamp: k个聚类，更细粒度的语义控制")
 print("  • k-SemStamp更适合复杂文本")
+
+# ============================================================================
+# 可视化
+# ============================================================================
+print("\n" + "=" * 80)
+print("📊 生成可视化...")
+print("=" * 80)
+
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
+
+fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+
+# 数据
+labels = ['Training\nCorpus', 'Watermarked\nText', 'Human\nText']
+z_scores = [z_train, z_watermarked, z_human]
+colors = ['#3498db', '#2ecc71', '#e74c3c']
+
+bars = ax.bar(labels, z_scores, color=colors, alpha=0.8, edgecolor='black', linewidth=2)
+
+ax.set_ylabel('Z-Score', fontsize=13, fontweight='bold')
+ax.set_title('k-SemStamp Detection Results', fontsize=15, fontweight='bold', pad=15)
+ax.axhline(y=4.0, color='green', linestyle='--', linewidth=2, alpha=0.7, label='Safe Threshold (Z=4.0)')
+ax.grid(axis='y', alpha=0.3, linestyle='--')
+ax.legend(fontsize=11)
+
+# 标注数值
+for bar, score in zip(bars, z_scores):
+    height = bar.get_height()
+    ax.text(bar.get_x() + bar.get_width()/2., height,
+            f'{score:.2f}', ha='center', va='bottom', fontsize=12, fontweight='bold')
+
+plt.tight_layout()
+output_file = 'k_semstamp_quick_test.png'
+plt.savefig(output_file, dpi=300, bbox_inches='tight')
+print(f"✅ 可视化已保存: {output_file}")
+plt.close()
