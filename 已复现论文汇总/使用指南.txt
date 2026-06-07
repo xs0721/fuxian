@@ -1,0 +1,344 @@
+================================================================================
+🎓 博士论文复现代码 - 使用指南
+================================================================================
+作者: [你的姓名]
+论文: 大模型水印技术综述
+更新: 2026-06-06
+================================================================================
+
+📁 文件位置
+================================================================================
+
+主目录: E:\大模型水印\综述\复现\
+
+核心文件:
+├── run_experiment.py (1081行，17个水印算法)
+├── test1-23.py (22个攻击测试)
+├── test_*.py (验证脚本)
+└── 已复现论文汇总\ (40个PDF + 总结文档)
+
+================================================================================
+🚀 快速开始
+================================================================================
+
+【1】验证所有代码
+```bash
+cd E:\大模型水印\综述\复现
+python 验证新增代码.py
+```
+
+【2】测试单个算法
+```bash
+# 测试ICW
+python test_icw_quick.py
+
+# 测试EWD
+python test_ewd_detection.py
+
+# 测试X-SIR
+python test_xsir_quick.py
+```
+
+【3】运行攻击测试
+```bash
+python test18_dipper_paraphrase.py
+python test19_mip_stealing.py
+python test20_adaptive_evasion.py
+python test21_cdg_kd.py
+python test22_xsir_consistency.py
+python test23_icw_watermark.py
+```
+
+================================================================================
+💻 代码使用示例
+================================================================================
+
+【示例1：使用Logits层水印（KGW, STA-1, SIR等）】
+
+```python
+from run_experiment import STA1LogitsProcessor, detect_watermark
+from transformers import AutoModelForCausalLM, AutoTokenizer, LogitsProcessorList
+import torch
+
+# 加载模型
+model = AutoModelForCausalLM.from_pretrained("facebook/opt-125m")
+tokenizer = AutoTokenizer.from_pretrained("facebook/opt-125m")
+vocab_size = 50272
+device = "cuda"
+
+# 生成水印文本
+prompt = "Machine learning is"
+input_ids = tokenizer.encode(prompt, return_tensors="pt").to(device)
+
+processor = STA1LogitsProcessor(vocab_size, gamma=0.5, delta=2.0)
+outputs = model.generate(
+    input_ids,
+    max_new_tokens=50,
+    logits_processor=LogitsProcessorList([processor]),
+    do_sample=True,
+    temperature=0.7
+)
+
+watermarked_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+print("带水印文本:", watermarked_text)
+
+# 检测水印
+z_score = detect_watermark(watermarked_text, "KGW", tokenizer, vocab_size)
+print(f"Z-score: {z_score:.2f}")
+```
+
+【示例2：使用Prompt层水印（ICW）】
+
+```python
+from run_experiment import ICWInitialsWatermark
+
+# 初始化ICW
+icw = ICWInitialsWatermark()
+
+# 生成带水印文本
+watermarked_text = icw.generate_with_watermark(
+    model=model,
+    tokenizer=tokenizer,
+    prompt="Explain artificial intelligence",
+    device="cuda",
+    max_new_tokens=100,
+    strength='medium'  # 'weak', 'medium', 'strong'
+)
+
+print("带水印文本:", watermarked_text)
+
+# 检测水印
+z_score = icw.detect_watermark(watermarked_text)
+print(f"ICW Z-score: {z_score:.2f}")
+```
+
+【示例3：对比不同算法】
+
+```python
+from run_experiment import (
+    KGWLogitsProcessor,
+    STA1LogitsProcessor,
+    SIRLogitsProcessor,
+    XSIRLogitsProcessor,
+    detect_watermark
+)
+
+algorithms = {
+    'KGW': KGWLogitsProcessor(vocab_size),
+    'STA-1': STA1LogitsProcessor(vocab_size),
+    'SIR': SIRLogitsProcessor(vocab_size),
+    'X-SIR': XSIRLogitsProcessor(vocab_size)
+}
+
+for name, processor in algorithms.items():
+    # 生成
+    outputs = model.generate(
+        input_ids,
+        max_new_tokens=50,
+        logits_processor=LogitsProcessorList([processor])
+    )
+    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    # 检测
+    z_score = detect_watermark(text, name, tokenizer, vocab_size)
+    print(f"{name:10} | Z-score: {z_score:6.2f}")
+```
+
+【示例4：使用EWD熵加权检测】
+
+```python
+from run_experiment import detect_watermark
+
+# 标准KGW检测
+z_kgw = detect_watermark(text, "KGW", tokenizer, vocab_size)
+
+# EWD熵加权检测（更低误报率）
+z_ewd = detect_watermark(text, "EWD", tokenizer, vocab_size)
+
+print(f"KGW Z-score: {z_kgw:.2f}")
+print(f"EWD Z-score: {z_ewd:.2f}")
+print(f"EWD改进: {z_ewd - z_kgw:+.2f}")
+```
+
+================================================================================
+📊 答辩演示建议
+================================================================================
+
+【演示1：水印生成效果】
+
+展示不同算法生成的带水印文本:
+• KGW: 标准基线
+• STA-1: 无偏水印（文本质量更好）
+• ICW: 黑盒水印（适用任何LLM）
+
+【演示2：检测性能对比】
+
+对比KGW vs EWD:
+• 人类文本: KGW Z=0.26, EWD Z=0.04 (误报率↓85%)
+• 水印文本: KGW Z=4.5, EWD Z=4.3 (检测率相当)
+
+【演示3：攻击防御能力】
+
+展示X-SIR vs KGW:
+• 原文: 都能检测
+• 改写后: X-SIR仍能检测，KGW失效
+
+【演示4：黑盒场景】
+
+展示ICW的独特价值:
+• 传统方法: 需要访问模型logits
+• ICW: 只需修改系统提示词
+
+================================================================================
+📚 论文引用对应关系
+================================================================================
+
+第三章 - 已实现的17个算法:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. KGW (ICML 2023)
+2. SWEET (ACL 2024)
+3. DiPmark (ICML 2024)
+4. STA-1 (ACL 2025)
+5. Unigram (ICLR 2024)
+6. TBW (arXiv 2024)
+7. SemStamp (NAACL 2024)
+8. SIR (ICLR 2024)
+9. X-SIR (ACL 2024) - 简化版
+10. KTH (ICLR 2024)
+11. Unforgeable/UPV (ICLR 2024)
+12. SmoothedWatermark
+13. PubliclyDetectable
+14. Gumbel/Transform/WaterMax
+15. EWD (ACL 2024) - 检测方法
+16-17. ICW Initials + Lexical (arXiv 2025) - Prompt层
+
+第四章 - 已实现的22个测试:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+test1-17: 原有攻击
+test18: DIPPER改写 (NeurIPS 2023)
+test19: MIP窃取 (ACSAC 2024)
+test20: 自适应逃逸 (ICML 2025)
+test21: CDG-KD蒸馏 (KBS 2025)
+test22: X-SIR一致性
+test23: ICW测试
+
+第五章 - 全覆盖:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+所有质量权衡论文的实验数据都在测试中
+
+================================================================================
+⚠️ 注意事项
+================================================================================
+
+【模型要求】
+
+• 默认模型: facebook/opt-125m
+• 位置: E:/Your_Cloud_Drive/hf_cache
+• GPU: CUDA支持（必需）
+
+【ICW特别说明】
+
+• ICW在小模型（OPT-125m）上效果有限
+• 论文使用GPT-4等大模型效果更好
+• 这是概念验证，不是生产级实现
+
+【X-SIR说明】
+
+• 实现的是简化版（鲁棒哈希）
+• 完整版需要多语言编码器（XLM-R）
+• 详见: X-SIR原始实现详解.txt
+
+【端到端训练类】
+
+• AWT, REMARK-LLM, RL-Watermark未实现
+• 需要数天到数周训练
+• 已有详细分析文档
+
+================================================================================
+🎯 常见问题
+================================================================================
+
+Q1: 为什么有些算法没实现？
+A: AWT、REMARK、RL-Watermark需要端到端训练（数天-数周），
+   不适合快速复现。已有详细分析文档说明原因。
+
+Q2: ICW效果为什么不明显？
+A: ICW依赖模型对指令的遵循能力，OPT-125m太小。
+   论文使用GPT-4等大模型效果更好。
+
+Q3: 如何评估水印质量？
+A: 运行test文件会生成图表，包含：
+   • 检测率（Z-score）
+   • 文本质量（PPL）
+   • 鲁棒性（改写后检测率）
+
+Q4: 代码可以商用吗？
+A: 本代码仅用于学术研究和论文支撑。
+   商用需要查看各算法的原始论文许可。
+
+Q5: 如何引用这些工作？
+A: 每个算法的论文PDF在"已复现论文汇总"文件夹中。
+
+================================================================================
+📞 技术支持
+================================================================================
+
+【文档位置】
+
+详细分析文档: E:\大模型水印\综述\复现\
+• EWD复现报告.txt
+• X-SIR复现完成报告.txt
+• X-SIR原始实现详解.txt
+• ICW复现完成报告.txt
+• AWT复现分析.txt
+• RL-Watermark核心思路详解.txt
+• 等18个文档
+
+总结报告: E:\大模型水印\综述\复现\已复现论文汇总\
+• 快速查看_复现总结.txt (最简洁)
+• README.txt
+• 论文复现总结报告.txt
+• 复现情况可视化总结.txt
+
+【代码仓库】
+
+原始GitHub仓库: E:\大模型水印\综述\文章\第*章引用\代码仓库\
+已克隆28个仓库
+
+【论文PDF】
+
+已整理: E:\大模型水印\综述\复现\已复现论文汇总\
+• 第三章: 12个
+• 第四章: 19个
+• 第五章: 9个
+
+================================================================================
+✅ 检查清单（答辩前）
+================================================================================
+
+□ 运行 验证新增代码.py 确保所有代码正常 ✅
+□ 运行 test_icw_quick.py 验证ICW ✅
+□ 运行 test_ewd_detection.py 验证EWD ✅
+□ 运行 test_xsir_quick.py 验证X-SIR ✅
+□ 检查"已复现论文汇总"文件夹（40个PDF）✅
+□ 阅读"快速查看_复现总结.txt"了解整体情况 ✅
+□ 准备演示案例（建议用示例1-4）
+□ 熟悉各算法的特点和优劣
+□ 准备回答"为什么有些算法没实现"的问题
+
+================================================================================
+🎊 祝答辩顺利！
+================================================================================
+
+你已经完成了:
+✅ 17个水印算法
+✅ 22个攻击测试
+✅ 40个论文PDF
+✅ 18个详细分析文档
+✅ ~2800行代码
+
+这是非常优秀的博士论文代码支撑工作！
+
+如有问题，查看"已复现论文汇总"文件夹中的详细文档。
+
+================================================================================

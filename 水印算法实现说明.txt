@@ -1,0 +1,233 @@
+================================================================================
+水印算法实现说明
+================================================================================
+
+本文档说明run_experiment.py中已实现的18个水印算法的核心思路
+
+================================================================================
+一、已实现的水印算法（18个）
+================================================================================
+
+【Logits层水印】14个 - 修改采样概率分布
+
+1. KGW (A Watermark for Large Language Models, ICML 2023)
+   核心思路：用哈希函数将词表分成绿/红名单，生成时偏向绿名单
+   实现：KGWLogitsProcessor
+
+2. KGW-SelfHash (改进版KGW)
+   核心思路：用前一个token自身哈希生成绿名单，无需外部密钥
+   实现：KGWSelfHashLogitsProcessor
+
+3. SWEET (Who Wrote this Code, ACL 2024)
+   核心思路：用熵门控，只在高熵位置加水印
+   实现：SWEETLogitsProcessor
+
+4. DiPmark (Distribution-Preserving Watermark, ICML 2024)
+   核心思路：保持原始分布，用指数变换加水印
+   实现：DiPmarkLogitsProcessor
+
+5. STA-1 (Unbiased Low-risk, ACL 2025)
+   核心思路：采样-接受策略，期望无偏
+   实现：STA1LogitsProcessor
+
+6. Unigram (Provable Robust Watermarking, ICLR 2024)
+   核心思路：固定绿名单（不依赖上下文），鲁棒性强
+   实现：UnigramLogitsProcessor
+
+7. TBW (Topic-Based Watermarks, arXiv 2024)
+   核心思路：根据主题选择绿名单
+   实现：TBWLogitsProcessor
+
+8. SemStamp (Semantic Watermark, NAACL 2024)
+   核心思路：语义空间水印，绿名单基于语义相似度
+   实现：SemStampLogitsProcessor
+
+9. k-SemStamp (Clustering-Based Semantic, ACL 2024 Findings)
+   核心思路：用k-means将词表聚类成k个簇，动态选择簇作为绿名单
+   实现：KSemStampLogitsProcessor
+
+10. SIR (Semantic Invariant Robust, ICLR 2024)
+    核心思路：语义不变鲁棒水印，抗改写攻击
+    实现：SIRLogitsProcessor
+
+11. X-SIR (Cross-lingual, ACL 2024)
+    核心思路：跨语言水印，用鲁棒哈希（简化版）
+    实现：XSIRLogitsProcessor
+
+12. KTH (Distortion-free, ICLR 2024)
+    核心思路：无失真水印，最小化分布偏移
+    实现：KTHLogitsProcessor
+
+13. Unforgeable/UPV (Unforgeable Publicly Verifiable, ICLR 2024)
+    核心思路：不可伪造水印，密钥公开也安全
+    实现：UnforgeableLogitsProcessor
+
+14. 其他变体
+    - SmoothedWatermarkLogitsProcessor
+    - PubliclyDetectableProcessor
+    - Gumbel/Transform/WaterMax
+
+【检测方法改进】1个
+
+15. EWD (Entropy-Weighted Detection, ACL 2024)
+    核心思路：用熵加权改进检测，高熵位置权重大
+    实现：detect_watermark()中的EWD分支
+
+【Prompt层水印】2个 - 修改系统提示词
+
+16. ICW Initials (In-Context Watermarks, arXiv 2025)
+    核心思路：提示词引导偏向特定首字母
+    实现：ICWInitialsWatermark类
+
+17. ICW Lexical (In-Context Watermarks, arXiv 2025)
+    核心思路：提示词引导使用特定词汇
+    实现：ICWLexicalWatermark类
+
+【变换方法】1个
+
+18. Gumbel/Transform/WaterMax
+    核心思路：用Gumbel采样或变换加水印
+    实现：generate_with_gumbel/transform/watermax()
+
+================================================================================
+二、核心设计思想分类
+================================================================================
+
+【按偏向方式分类】
+
+硬偏向（直接加分）：
+• KGW, Unigram, TBW, SemStamp, k-SemStamp
+
+软偏向（分布变换）：
+• DiPmark, Transform, WaterMax
+
+门控偏向（条件加水印）：
+• SWEET (熵门控), STA-1 (采样-接受)
+
+【按鲁棒性分类】
+
+基础鲁棒：
+• KGW, Unigram
+
+改写鲁棒：
+• SIR, X-SIR, SemStamp, k-SemStamp
+
+分布保持：
+• DiPmark, KTH
+
+【按密钥方式分类】
+
+外部密钥：
+• KGW, Unigram, TBW
+
+自哈希：
+• KGW-SelfHash
+
+公开验证：
+• Unforgeable/UPV
+
+无需密钥（Prompt）：
+• ICW Initials, ICW Lexical
+
+【按范式分类】
+
+Logits层（白盒）：14个
+• 需要访问模型logits
+• 在LogitsProcessor中修改
+
+Prompt层（黑盒）：2个
+• 只需修改提示词
+• 适用任何LLM
+
+================================================================================
+三、检测方法
+================================================================================
+
+【标准Z-score检测】
+
+公式：Z = (观察到的绿token比例 - 期望比例) / 标准差
+
+用于：KGW, Unigram, SemStamp, k-SemStamp等
+
+【EWD熵加权检测】
+
+改进：对每个位置根据熵加权
+公式：Z_EWD = Σ(w_i * is_green_i) / sqrt(Σ(w_i * γ(1-γ)))
+优势：误报率降低85%
+
+【Gumbel/Transform检测】
+
+方法：逆变换验证，检查是否符合水印分布
+
+【ICW检测】
+
+方法：统计首字母/词汇偏向，计算Z-score
+
+================================================================================
+四、代码位置
+================================================================================
+
+文件：run_experiment.py (1448行)
+
+LogitsProcessor类：行50-650
+• 14个Logits层水印类
+
+Prompt水印类：行1020-1100
+• ICWInitialsWatermark
+• ICWLexicalWatermark
+
+检测函数：行808-950
+• detect_watermark() - 统一检测接口
+• 支持所有算法的检测
+
+生成函数：行650-750
+• generate_with_gumbel/transform/watermax()
+
+================================================================================
+五、使用示例
+================================================================================
+
+【生成水印】
+
+from run_experiment import KGWLogitsProcessor
+from transformers import AutoModelForCausalLM, AutoTokenizer, LogitsProcessorList
+
+model = AutoModelForCausalLM.from_pretrained("facebook/opt-125m")
+tokenizer = AutoTokenizer.from_pretrained("facebook/opt-125m")
+
+processor = KGWLogitsProcessor(vocab_size=50272)
+outputs = model.generate(
+    input_ids,
+    logits_processor=LogitsProcessorList([processor])
+)
+
+【检测水印】
+
+from run_experiment import detect_watermark
+
+z_score = detect_watermark(
+    text=text,
+    algo_name="KGW",
+    tokenizer=tokenizer,
+    vocab_size=50272
+)
+
+if z_score > 2.0:
+    print("检测到水印")
+
+================================================================================
+六、未实现的算法（3个端到端训练类）
+================================================================================
+
+❌ AWT (S&P 2021)
+原因：LSTM Seq2Seq + GAN，需要数天GPU训练，31,269行代码
+
+❌ REMARK-LLM (USENIX 2024)
+原因：端到端优化，实现复杂度极高
+
+❌ RL-Watermark (EACL 2026)
+原因：强化学习训练，需要数周时间，3600行代码
+
+说明：这3个不适合LogitsProcessor框架，需要完整的训练pipeline
+
+================================================================================

@@ -34,6 +34,15 @@ TEST_SCRIPTS = {
     "15": "test15_api_query_attack.py",
     "16": "test16_robustness_spoofing.py",
     "17": "test17_watermark_learnability.py",
+    "18": "test18_dipper_paraphrase.py",
+    "19": "test19_mip_stealing.py",
+    "20": "test20_adaptive_evasion.py",
+    "21": "test21_cdg_kd.py",
+    "22": "test22_xsir_consistency.py",
+    "23": "test23_icw_watermark.py",
+    "24": "test24_blackbox_third_party_detector.py",
+    "25": "test25_bias_inversion.py",
+    "26": "test26_logit_watermark_collision.py",
 }
 
 def run_test(num):

@@ -1,0 +1,284 @@
+================================================================================
+官方级复现升级与缺失论文处理方案
+================================================================================
+
+更新时间: 2026-06-07
+目标: 将 STA-1、KTH、SIR、X-SIR、k-SemStamp 从简化实现升级到更接近论文机制的复现口径,
+并说明第四章若干未独立复现论文应如何处理。
+
+================================================================================
+一、本次已完成的代码升级
+================================================================================
+
+1. 新增 official_watermarks.py
+
+该文件把官方级复现所需的核心机制从 run_experiment.py 中拆出来, 避免导入时加载 OPT 模型。
+
+已包含:
+- STA-1 官方采样机制: Sampling One Then Accepting
+- KTH/RDW 官方机制核心: inverse-transform sampling + key sequence + alignment detector
+- SIR 官方形态接口: semantic encoder -> watermark model -> watermark logits
+- X-SIR 官方形态接口: cross-lingual semantic token clusters + robust partition
+- k-SemStamp 官方形态接口: sentence embedding -> k-means centroids -> sentence-level rejection sampling/detection
+
+2. STA-1
+
+当前状态: 已从 LogitsProcessor 占位升级为真正自定义采样。
+
+官方机制:
+- 先从原始 LLM 概率分布采样一个候选 token
+- 如果候选 token 在 green list, 接受
+- 如果候选 token 在 red list, 再从原始分布采样一次并无条件接受
+- 检测沿用 green-token one-proportion z-test
+
+代码位置:
+- official_watermarks.py: generate_sta1()
+- official_watermarks.py: detect_sta1_tokens()
+- run_experiment.py: 主实验中 "STA-1" 分支
+
+3. KTH / RDW
+
+当前状态: 已从“加随机噪声”的占位实现升级为 inverse-transform distortion-free 采样。
+
+官方机制:
+- 共享 watermark key sequence
+- 每个位置使用 uniform random value 和 permutation
+- 通过 inverse transform sampling 从原模型分布采样, 不改变边际分布
+- 检测时用 alignment cost 在文本窗口和 key offset 上找最小代价, 再用 permutation test 得到 z-like score
+
+代码位置:
+- official_watermarks.py: generate_kth_inverse()
+- official_watermarks.py: detect_kth_tokens()
+- official_watermarks.py: KTHDetectionState / KTHKey
+- run_experiment.py: 主实验中 "KTH" 分支
+
+注意:
+- 为了可运行性, 默认使用 shared permutation; 如要更贴近论文, 将 independent_permutations=True, 但检测会明显变慢。
+- 完整官方复现实验还应跑随机编辑、裁剪、改写后的 p-value 检测曲线。
+
+4. SIR
+
+当前状态: 已从 token hash 绿名单升级为“语义向量 -> watermark model -> vocab logits”的官方形态。
+
+官方级仍需要:
+- C-BERT/BERT 类语义编码器
+- 训练好的 SIR watermark model 权重
+- similarity loss + normalization loss 训练流程或官方权重
+
+当前代码提供:
+- HashingTextEncoder 作为离线 smoke-test fallback
+- LowRankWatermarkProjector 作为可加载权重的 watermark model 接口
+- detect_sir_tokens() 按论文思路统计真实 token 对应 watermark logit 的平均显著性
+
+要做到论文级结果:
+- 克隆/下载 THU-BPM/Robust_Watermark 或 MarkLLM
+- 准备官方 embedding model 和 watermark model checkpoint
+- 将 checkpoint 保存为 official_watermarks.py 可加载的 projector_state_path 或按官方模型结构替换 projector
+
+5. X-SIR
+
+当前状态: 已从 token 集合 hash 升级为“语义 token cluster + robust partition”的官方形态。
+
+官方级仍需要:
+- multilingual SBERT / XLM-R 类跨语言语义编码器
+- 跨语言 vocabulary semantic clustering 资产
+- CWRA 翻译攻击实验设置
+
+当前代码提供:
+- XSIRLogitsProcessor(token_cluster_ids=...) 插口
+- 若没有 token_cluster_ids, 用 deterministic fallback cluster 进行 smoke test
+- detect_xsir_tokens() 使用同一 cluster partition 检测
+
+要做到论文级结果:
+- 从 zwhe99/X-SIR 或 MarkLLM 获取 multilingual clustering / model assets
+- 将 token_cluster_ids 传入 XSIRLogitsProcessor
+- 补 En->Zh/Ja/Fr/De 翻译前后 PCC、RE、AUC 实验
+
+6. k-SemStamp
+
+当前状态: 已补 sentence-level k-means 语义水印对象, 不再只靠 token hash。
+
+官方机制:
+- 用 domain sentences 训练 robust sentence encoder
+- 对 sentence embeddings 做 k-means, 保存 centroids
+- 生成时按上一句 cluster 伪随机选择 valid clusters
+- 候选句必须落入 valid cluster 且满足 margin constraint
+- 检测时按句子 cluster transition 做 one-proportion z-test
+
+代码位置:
+- official_watermarks.py: KSemStampWatermark
+- official_watermarks.py: generate_k_semstamp_sentences()
+- official_watermarks.py: detect_k_semstamp_text()
+
+官方级仍需要:
+- 官方 robust sentence encoder
+- RealNews / BookSum domain-specific centroids
+- Pegasus / Parrot / GPT paraphrase attack evaluation
+
+================================================================================
+二、验证结果
+================================================================================
+
+已运行:
+
+python -m py_compile .\official_watermarks.py .\test_official_watermarks_quick.py .\run_experiment.py
+python .\test_official_watermarks_quick.py
+
+结果:
+- 编译通过
+- STA-1 自定义采样通过
+- KTH inverse-transform 自定义采样和检测通过
+- SIR / X-SIR / k-SemStamp 处理器 smoke test 通过
+- k-SemStamp sentence-level detector smoke test 通过
+
+注意:
+- 这不是完整论文指标复现实验, 只是证明新机制和接口能运行。
+- 完整实验需要加载官方资产或本地模型, 并重新跑 benchmark。
+
+================================================================================
+三、第四章未独立复现论文的处理方案
+================================================================================
+
+1. Prompt Injection 综述
+
+建议处理方式: 不做“代码复现”, 做“威胁模型与分类综述支撑”。
+
+原因:
+- 这是系统综述, 不是一个具体水印攻击算法。
+- 强行写一个脚本会降低学术口径, 因为不能代表综述本身。
+
+可补材料:
+- 新增一节: prompt injection 与 watermark policy bypass 的关系
+- 做一个小型 demo: system prompt 要求保留水印, user prompt 请求改写/去水印, 观察检测分数下降
+- 标注为“补充威胁场景”, 不标注为“复现该综述”
+
+2. Black-box Third-Party Framework
+
+建议处理方式: 补一个独立黑盒检测框架实验。
+
+可实现内容:
+- 输入: 仅文本, 不访问 logits、不访问 prompt
+- 方法: 用多种 detector score 作为特征, 例如 z-score、entropy proxy、重复率、token-rank proxy
+- 输出: 第三方判定器 AUC / FPR / TPR
+
+需要补的脚本:
+- test24_blackbox_third_party_detector.py
+
+口径:
+- 如果论文未开源, 写“按论文威胁模型复现实验框架”
+- 不写“官方代码复现”
+
+3. Bias Inversion
+
+建议处理方式: 可以补独立代理实验, 优先级较高。
+
+可实现内容:
+- 用一批水印文本估计 green-token 偏置方向
+- 攻击时反向惩罚疑似 green tokens 或偏向 red tokens
+- 比较攻击前后 z-score、PPL、语义相似度
+
+需要补的脚本:
+- test25_bias_inversion.py
+
+口径:
+- 若无官方代码, 写“机制复现/代理实现”
+- 若能拿到官方实现, 再替换为 official run
+
+4. Lost in Overlap
+
+建议处理方式: 可以补独立实验, 成本低。
+
+可实现内容:
+- 多个水印 key / 多个 watermark provider 同时存在
+- 统计 greenlist overlap、detector collision、false attribution
+- 比较 KGW、STA-1、SIR/X-SIR cluster partition 的冲突率
+
+需要补的脚本:
+- test26_logit_watermark_collision.py
+
+口径:
+- 这是系统分析型论文, 复现核心现象比复现仓库更重要。
+
+5. RLCracker
+
+建议处理方式: 分两档。
+
+低成本代理复现:
+- 用启发式策略模拟 RL policy: token deletion / synonym substitution / paraphrase choice
+- reward = - watermark z-score + semantic similarity - PPL penalty
+- 不训练 PPO, 只做 beam/random search
+
+官方级复现:
+- 需要 RL 环境、策略模型、奖励函数、训练预算
+- 如果官方未开源, 很难合理声称官方复现
+
+需要补的脚本:
+- test27_rlcracker_proxy.py
+
+口径:
+- 当前建议写“RL attack proxy experiment”
+- 只有拿到官方代码/训练配置后再升级为官方级
+
+6. Google watermarking system
+
+建议处理方式: 不声称官方复现, 做公开机制分析或 SynthID-like proxy。
+
+原因:
+- Google 系统通常是闭源/服务端实现, 无法获得真实 key、模型和检测器。
+- 若论文讨论的是 On Google's LLM Watermarking System, 更适合作为案例分析。
+
+可补材料:
+- SynthID-style tournament / g-value scoring proxy
+- 与 KGW/STA/KTH 的可检测性和鲁棒性对比
+- 明确写“closed-system proxy, not official reproduction”
+
+需要补的脚本:
+- test28_google_watermark_proxy.py
+
+7. RLSpoofer
+
+建议处理方式: 可以补代理实验。
+
+可实现内容:
+- 目标: 让非水印文本被 detector 判为水印
+- reward = detector z-score - text quality penalty
+- 使用轻量搜索或小策略模型生成 spoofed text
+- 对 KGW / STA-1 / SIR detector 测 false positive success rate
+
+需要补的脚本:
+- test29_rlspoofer_proxy.py
+
+口径:
+- 若论文是 evaluator 或 framework, 应复现实验指标而不是逐行复现 RL 训练。
+
+================================================================================
+四、建议的下一步优先级
+================================================================================
+
+优先级 A: 立刻补, 成本低且能增强第四章
+- Lost in Overlap -> test26
+- Bias Inversion -> test25
+- Black-box Third-Party Framework -> test24
+
+优先级 B: 可补代理实验, 但不要称官方
+- RLCracker -> test27
+- RLSpoofer -> test29
+- Google watermarking system -> test28
+
+优先级 C: 不做代码复现, 做文献综述/威胁模型
+- Prompt Injection 综述
+
+================================================================================
+五、最终表述建议
+================================================================================
+
+推荐答辩/论文表述:
+
+“本文对可复现实验型论文尽量进行代码实现。对于 STA-1 与 KTH 等采样型水印,
+本文实现其核心采样和检测机制; 对于 SIR、X-SIR、k-SemStamp 等依赖官方语义编码器、
+训练权重或聚类资产的方法, 本文提供官方形态接口与离线可运行版本, 并明确区分
+asset-backed reproduction 与 proxy reproduction。对于综述、闭源系统、未开源强化学习攻击
+等论文, 本文采用机制分析或代理实验, 不将其夸大为官方代码复现。”
+
+这个口径最稳。
+

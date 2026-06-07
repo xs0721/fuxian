@@ -1,0 +1,335 @@
+================================================================================
+X-SIR 原始实现详解 - 论文vs实际代码
+================================================================================
+分析时间: 2026-06-06
+基于: https://github.com/zwhe99/X-SIR
+论文: Can Watermarks Survive Translation? (ACL 2024)
+================================================================================
+
+一、X-SIR的真实实现方式
+================================================================================
+
+【核心架构】
+
+X-SIR使用了一个复杂的三层架构：
+
+1. 语义编码器 (Embedding Model)
+   └─> 提取上下文的语义表示
+
+2. 变换模型 (Transform Model)
+   └─> 将语义表示映射到水印空间
+
+3. 映射表 (Mapping)
+   └─> 将水印空间映射到token偏置
+
+流程: 上下文文本 → 语义编码 → 变换模型 → 水印向量 → token偏置
+
+================================================================================
+二、关键组件详解
+================================================================================
+
+【1】语义编码器（Embedding Model）
+
+支持两种模型:
+```python
+# 选项1: C-BERT (单语言)
+embedding_model = "perceptiveshawty/compositional-bert-large-uncased"
+# 输出维度: 1024
+
+# 选项2: Multilingual SBERT (多语言) ⭐ 推荐
+embedding_model = "paraphrase-multilingual-mpnet-base-v2"
+# 输出维度: 768
+```
+
+作用:
+- 提取上下文的语义嵌入向量
+- 多语言模型保证跨语言语义一致性
+- 翻译后语义相似 → 嵌入相似
+
+【2】变换模型（Transform Model）
+
+```python
+class TransformModel(nn.Module):
+    def __init__(self, input_dim=768):
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(input_dim, 512),
+            nn.ReLU(),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, vocab_size)  # 输出vocab_size维向量
+        )
+```
+
+作用:
+- 将语义嵌入映射到水印空间
+- 输出: vocab_size维的相似度向量
+- 需要预训练（train_watermark_model.py）
+
+【3】映射表（Mapping）
+
+```python
+# 预先生成的随机映射: token_id → watermark_dim
+mapping = [random.randint(0, watermark_dim - 1) for _ in range(vocab_size)]
+# 保存为JSON文件，生成和检测时共用
+```
+
+作用:
+- 将变换模型的输出映射到每个token的偏置
+- 随机映射增加安全性
+
+================================================================================
+三、生成流程（完整版）
+================================================================================
+
+```python
+class WatermarkContext(WatermarkBase):
+    def _get_bias(self, input_ids):
+        # 步骤1: 获取上下文文本
+        context_sentence = self.get_context_sentence(input_ids)
+        # 例: "The quick brown fox"
+
+        # 步骤2: 语义编码 (多语言SBERT)
+        context_embedding = self.get_embedding(context_sentence)
+        # 输出: [1, 768] 语义向量
+
+        # 步骤3: 变换模型
+        output = self.transform_model(context_embedding)
+        # 输出: [1, vocab_size] 相似度向量
+
+        # 步骤4: 缩放和映射
+        similarity_array = self.scale_vector(output)[self.mapping]
+        # scale_vector: 归一化到[-1, 1]
+        # mapping: 根据预定义映射重排
+
+        # 步骤5: 返回偏置
+        return -similarity_array  # 负号：相似度高的token获得正偏置
+```
+
+关键点:
+✅ 使用多语言语义编码器（paraphrase-multilingual-mpnet-base-v2）
+✅ 变换模型将语义映射到token空间
+✅ 预训练的映射保证一致性
+
+================================================================================
+四、检测流程（完整版）
+================================================================================
+
+```python
+def detect(self, text):
+    # 将文本分块
+    word_2d = self.get_text_split(text)
+
+    all_value = []
+    for i in range(1, len(word_2d)):
+        # 步骤1: 获取前i个块作为上下文
+        context_sentence = "".join(word_2d[0:i])
+
+        # 步骤2: 语义编码
+        context_embedding = self.get_embedding(context_sentence)
+
+        # 步骤3: 变换模型
+        output = self.transform_model(context_embedding)
+        similarity_array = self.scale_vector(output)[self.mapping]
+
+        # 步骤4: 检测第i块的token
+        tokens = word_2d[i]
+        for tok_id in tokens:
+            # 相似度越高，越可能是水印token
+            all_value.append(-similarity_array[tok_id])
+
+    # 返回平均分数作为Z-score
+    return {"z_score": np.mean(all_value)}
+```
+
+================================================================================
+五、为什么需要多语言模型？
+================================================================================
+
+【关键原因】
+
+1. **语义一致性**
+   - 英文: "The cat sat on the mat"
+   - 中文: "猫坐在垫子上"
+   - 多语言SBERT确保两者的embedding相似
+
+2. **变换模型的输入**
+   - 变换模型基于语义embedding工作
+   - 跨语言语义相似 → 变换输出相似 → 偏置相似
+
+3. **检测一致性**
+   - 原文和译文走相同流程
+   - 语义相似 → 检测分数相似
+
+【为什么单语言模型不行？】
+
+单语言BERT (如C-BERT):
+❌ 只训练在英文数据上
+❌ 中文输入会产生无意义的embedding
+❌ 跨语言embedding空间不对齐
+
+多语言模型 (如paraphrase-multilingual-mpnet-base-v2):
+✅ 在100+语言上训练
+✅ 跨语言语义对齐
+✅ "cat" 和 "猫" 的embedding接近
+
+================================================================================
+六、本实现（简化版）vs 原始实现（完整版）
+================================================================================
+
+┌────────────────────────┬─────────────────────┬─────────────────────┐
+│ 组件                   │ 原始实现（论文）    │ 本简化版            │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 语义编码器             │ multilingual-mpnet  │ 鲁棒哈希函数        │
+│                        │ (768维向量)         │ (整数哈希)          │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 变换模型               │ 3层MLP              │ 无                  │
+│                        │ (预训练)            │                     │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 映射表                 │ 预生成随机映射      │ 直接哈希            │
+│                        │ (JSON文件)          │                     │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 上下文提取             │ 分块处理            │ 滑动窗口            │
+│                        │ (chunk_length)      │ (8 tokens)          │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 跨语言支持             │ 真实多语言          │ 改写模拟            │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 额外依赖               │ sentence-transformers│ 无                  │
+│                        │ 预训练模型文件      │                     │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 实现复杂度             │ 高                  │ 低                  │
+├────────────────────────┼─────────────────────┼─────────────────────┤
+│ 准确性                 │ 论文报告70-80%      │ 估计40-60%          │
+└────────────────────────┴─────────────────────┴─────────────────────┘
+
+================================================================================
+七、简化版的合理性
+================================================================================
+
+【为什么简化版仍然有意义？】
+
+1. **核心思想保留** ✅
+   - 原版: 语义相似 → embedding相似 → 偏置相似
+   - 简化: 语义相似 → 哈希相似 → 绿名单相似
+   - 都是基于"语义鲁棒性"
+
+2. **实用性** ✅
+   - 无需下载多个大模型
+   - 无需预训练变换模型
+   - 可在现有环境运行
+
+3. **教学价值** ✅
+   - 理解X-SIR的核心机制
+   - 快速原型验证
+
+【局限性】
+
+1. **精度差距**
+   - 简化哈希 << 768维语义向量
+   - 信息损失较大
+
+2. **真正跨语言**
+   - 简化版只是"鲁棒"，不是"跨语言"
+   - 无法处理真实翻译场景
+
+3. **性能差距**
+   - 论文: 70-80%一致性
+   - 简化版: 可能只有40-60%
+
+================================================================================
+八、如何升级到完整版？
+================================================================================
+
+【升级步骤】
+
+1. **安装依赖**
+```bash
+pip install sentence-transformers
+pip install torch torchvision
+```
+
+2. **下载语义编码器**
+```python
+from sentence_transformers import SentenceTransformer
+embedding_model = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+# 自动下载到~/.cache/torch/sentence_transformers/
+```
+
+3. **训练变换模型**
+```bash
+cd 28_CWRA-X-SIR/src_watermark/xsir
+python train_watermark_model.py \
+    --embedding_model paraphrase-multilingual-mpnet-base-v2 \
+    --output transform_model.pth
+```
+
+4. **生成映射表**
+```bash
+python generate_mappings.py \
+    --vocab_size 50272 \
+    --output mapping.json
+```
+
+5. **集成到run_experiment.py**
+```python
+class XSIRFullLogitsProcessor(LogitsProcessor):
+    def __init__(self, vocab_size, transform_model_path, mapping_file):
+        # 加载多语言编码器
+        self.embedding_model = SentenceTransformer(
+            "paraphrase-multilingual-mpnet-base-v2"
+        )
+
+        # 加载变换模型
+        self.transform_model = TransformModel(input_dim=768)
+        self.transform_model.load_state_dict(torch.load(transform_model_path))
+
+        # 加载映射表
+        with open(mapping_file) as f:
+            self.mapping = json.load(f)
+
+    def __call__(self, input_ids, scores):
+        # 与原始实现一致
+        context_sentence = tokenizer.decode(input_ids[0])
+        context_embedding = self.embedding_model.encode(
+            context_sentence, convert_to_tensor=True
+        )
+        output = self.transform_model(context_embedding)
+        similarity_array = scale_vector(output)[self.mapping]
+        scores += torch.tensor(similarity_array) * self.delta
+        return scores
+```
+
+================================================================================
+九、总结
+================================================================================
+
+【原始X-SIR实现的关键】
+
+1. ✅ 使用多语言语义编码器（paraphrase-multilingual-mpnet-base-v2）
+2. ✅ 训练变换模型（MLP，768→vocab_size）
+3. ✅ 预生成随机映射表
+4. ✅ 基于语义embedding的偏置计算
+
+【为什么这样设计？】
+
+- 多语言编码器：确保跨语言语义一致性
+- 变换模型：将语义空间映射到token空间
+- 映射表：增加安全性和随机性
+- 语义偏置：翻译后语义相似 → 偏置相似 → 水印保持
+
+【简化版的价值】
+
+- 验证核心思想：语义鲁棒性
+- 无需额外模型和训练
+- 快速原型和教学
+
+【完整版的必要性】
+
+如果需要：
+- 真正的跨语言水印
+- 达到论文报告的70-80%性能
+- 生产环境部署
+
+则必须使用完整版实现（多语言编码器 + 变换模型）
+
+================================================================================
