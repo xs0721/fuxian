@@ -66,11 +66,20 @@ print("\n[4/4] 对比KGW vs EWD...")
 print("-" * 60)
 print(f"{'样本类型':<15} | {'KGW Z-score':<15} | {'EWD Z-score':<15} | {'差异':<10}")
 print("-" * 60)
+
+# 收集结果用于可视化
+results = {}
+sample_keys = {'带水印文本': 'watermarked', '人类文本': 'human', '短文本': 'short'}
+
 for name, text in test_samples.items():
     z_kgw = detect_watermark(text, "KGW", tokenizer, vocab_size, gamma=0.5)
     z_ewd = detect_watermark(text, "EWD", tokenizer, vocab_size, gamma=0.5)
     diff = z_ewd - z_kgw
     print(f"{name:<15} | {z_kgw:<15.2f} | {z_ewd:<15.2f} | {diff:+.2f}")
+
+    # 保存结果
+    key = sample_keys[name]
+    results[key] = {'kgw': z_kgw, 'ewd': z_ewd}
 
 print("\n" + "=" * 80)
 print("EWD关键特性验证:")
@@ -93,3 +102,71 @@ print("  1. 辅助函数: calculate_entropy_for_ewd() - 完整熵计算")
 print("  2. 检测分支: detect_watermark() 中 algo_name=='EWD'")
 print("\n使用方法:")
 print("  z_score = detect_watermark(text, 'EWD', tokenizer, vocab_size)")
+
+# ============================================================================
+# 可视化对比 KGW vs EWD
+# ============================================================================
+print("\n" + "=" * 80)
+print("📊 生成可视化对比图...")
+print("=" * 80)
+
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
+matplotlib.rcParams['axes.unicode_minus'] = False
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+
+# 数据准备
+sample_names = ['Watermarked\nText', 'Human\nText', 'Short\nText']
+kgw_scores = [results[name]['kgw'] for name in ['watermarked', 'human', 'short']]
+ewd_scores = [results[name]['ewd'] for name in ['watermarked', 'human', 'short']]
+
+# 图1: 柱状图对比
+x = range(len(sample_names))
+width = 0.35
+bars1 = ax1.bar([i - width/2 for i in x], kgw_scores, width, label='KGW', alpha=0.8, color='#3498db')
+bars2 = ax1.bar([i + width/2 for i in x], ewd_scores, width, label='EWD', alpha=0.8, color='#e74c3c')
+
+ax1.set_ylabel('Z-Score', fontsize=12, fontweight='bold')
+ax1.set_title('KGW vs EWD Detection Comparison', fontsize=14, fontweight='bold', pad=15)
+ax1.set_xticks(x)
+ax1.set_xticklabels(sample_names, fontsize=11)
+ax1.legend(fontsize=11)
+ax1.axhline(y=4.0, color='green', linestyle='--', linewidth=1.5, alpha=0.7, label='Safe Threshold (Z=4.0)')
+ax1.grid(axis='y', alpha=0.3, linestyle='--')
+
+# 在柱子上标注数值
+for bars in [bars1, bars2]:
+    for bar in bars:
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height,
+                f'{height:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+
+# 图2: 差异分析
+diffs = [kgw - ewd for kgw, ewd in zip(kgw_scores, ewd_scores)]
+colors = ['#27ae60' if d < 0 else '#e67e22' for d in diffs]
+bars3 = ax2.bar(x, diffs, color=colors, alpha=0.8, edgecolor='black', linewidth=1.5)
+
+ax2.set_ylabel('Z-Score Difference (KGW - EWD)', fontsize=12, fontweight='bold')
+ax2.set_title('EWD Improvement Over KGW', fontsize=14, fontweight='bold', pad=15)
+ax2.set_xticks(x)
+ax2.set_xticklabels(sample_names, fontsize=11)
+ax2.axhline(y=0, color='black', linestyle='-', linewidth=2)
+ax2.grid(axis='y', alpha=0.3, linestyle='--')
+
+# 标注差异值
+for i, (bar, diff) in enumerate(zip(bars3, diffs)):
+    height = bar.get_height()
+    va = 'bottom' if height > 0 else 'top'
+    ax2.text(bar.get_x() + bar.get_width()/2., height,
+            f'{diff:+.2f}', ha='center', va=va, fontsize=10, fontweight='bold')
+
+plt.tight_layout()
+output_file = 'ewd_comparison_plot.png'
+plt.savefig(output_file, dpi=300, bbox_inches='tight')
+print(f"\n✅ 可视化图表已保存: {output_file}")
+print("\n图表说明:")
+print("  - 左图: KGW vs EWD的Z-score对比")
+print("  - 右图: EWD相对KGW的改进（负值表示EWD更低，对人类文本更友好）")
+plt.close()
