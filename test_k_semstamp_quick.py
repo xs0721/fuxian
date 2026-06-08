@@ -64,7 +64,7 @@ try:
     # 检查token到簇的映射
     cluster_distribution = {}
     for token_id in range(min(1000, vocab_size)):  # 只检查前1000个
-        cluster_id = int(processor.token_clusters[token_id].item())
+        cluster_id = processor.token_to_cluster[token_id]
         cluster_distribution[cluster_id] = cluster_distribution.get(cluster_id, 0) + 1
 
     print("✅ 聚类分配正常")
@@ -81,14 +81,20 @@ try:
     tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
 
     # 测试文本
-    test_text = "Machine learning is a method of data analysis that automates analytical model building."
+    test_text_watermarked = "Machine learning is a method of data analysis that automates analytical model building."
+    test_text_human = "The quick brown fox jumps over the lazy dog and runs away quickly."
+    test_text_train = "Artificial intelligence and machine learning are transforming modern technology."
 
     # 检测
-    z_score = detect_watermark(test_text, "k-SemStamp", tokenizer, vocab_size)
+    z_watermarked = detect_watermark(test_text_watermarked, "k-SemStamp", tokenizer, vocab_size)
+    z_human = detect_watermark(test_text_human, "k-SemStamp", tokenizer, vocab_size)
+    z_train = detect_watermark(test_text_train, "k-SemStamp", tokenizer, vocab_size)
 
     print("✅ k-SemStamp检测功能正常")
-    print(f"   测试文本: {test_text[:50]}...")
-    print(f"   Z-score: {z_score:.2f}")
+    print(f"   水印文本: {test_text_watermarked[:50]}...")
+    print(f"   Z-score: {z_watermarked:.2f}")
+    print(f"   人类文本 Z-score: {z_human:.2f}")
+    print(f"   训练语料 Z-score: {z_train:.2f}")
 except Exception as e:
     print(f"❌ k-SemStamp检测测试失败: {e}")
     import traceback
