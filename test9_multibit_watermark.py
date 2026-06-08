@@ -78,6 +78,10 @@ class _NonMmapFile:
     def keys(self):
         return self._tensor_meta.keys()
 
+    def metadata(self):
+        """返回元数据字典（兼容transformers新版本）"""
+        return self._metadata.get('__metadata__', {})
+
     def get_tensor(self, name):
         info = self._tensor_meta[name]
         offsets = info['data_offsets']
@@ -191,23 +195,47 @@ def load_multibit_models():
     if _multibit_loaded:
         return
 
-    print(f"[GPU: {VRAM_GB:.1f}GB] 策略: model0 GPU 4-bit + model1 CPU fp16")
+    # ── 检测 bitsandbytes 可用性 ──
+    USE_4BIT = False
+    try:
+        from transformers import BitsAndBytesConfig
+        import bitsandbytes as bnb_module
+        # 测试关键API是否存在
+        _ = torch.library.impl_abstract if hasattr(torch.library, 'impl_abstract') else None
+        USE_4BIT = True
+        print(f"[GPU: {VRAM_GB:.1f}GB] 策略: model0 GPU 4-bit + model1 CPU fp16")
+    except (ImportError, AttributeError) as e:
+        print(f"⚠️  bitsandbytes 不可用 ({e.__class__.__name__})")
+        print(f"[GPU: {VRAM_GB:.1f}GB] 降级策略: 全部使用 fp16（显存占用会更高）")
+        USE_4BIT = False
+
     print("加载 tokenizer...")
     _tokenizer = utils.get_tokenizer('opt-2.7b')
     _tokenizer.padding_side = 'left'
 
-    bnb = BitsAndBytesConfig(
-        load_in_4bit=True, bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True,
-    )
+    if USE_4BIT:
+        bnb = BitsAndBytesConfig(
+            load_in_4bit=True, bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.float16, bnb_4bit_use_double_quant=True,
+        )
+    else:
+        bnb = None
 
-    # ── RewardModel: GPU 4-bit (先加载, 占~1.1GB) ──
-    print("加载 RewardModel (1.5B, GPU 4-bit)...")
-    base_model = AutoModel.from_pretrained(
-        RM_PATH, quantization_config=bnb,
-        device_map="cuda:0", low_cpu_mem_usage=True,
-        trust_remote_code=True,
-    )
+    # ── RewardModel: GPU 4-bit 或 fp16 ──
+    if USE_4BIT:
+        print("加载 RewardModel (1.5B, GPU 4-bit)...")
+        base_model = AutoModel.from_pretrained(
+            RM_PATH, quantization_config=bnb,
+            device_map="cuda:0", low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
+    else:
+        print("加载 RewardModel (1.5B, GPU fp16)...")
+        base_model = AutoModel.from_pretrained(
+            RM_PATH, torch_dtype=torch.float16,
+            device_map="cuda:0", low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
     _reward_model = model_utils.RewardModel(base_model, _tokenizer)
     _reward_model.v_head.load_state_dict(
         torch.load(RM_HEADER_PATH, map_location='cpu', weights_only=True)
@@ -219,12 +247,19 @@ def load_multibit_models():
     alloc_rm = torch.cuda.memory_allocated(0) / 1024**3
     print(f"  RewardModel GPU: {alloc_rm:.1f} GB")
 
-    # ── Model0: GPU 4-bit ──────────────────────────
-    print("加载 model0 (GPU 4-bit)...")
-    _actor_model0 = AutoModelForCausalLM.from_pretrained(
-        MODEL0_PATH, quantization_config=bnb,
-        device_map="cuda:0", low_cpu_mem_usage=True,
-    ).eval()
+    # ── Model0: GPU 4-bit 或 fp16 ──
+    if USE_4BIT:
+        print("加载 model0 (GPU 4-bit)...")
+        _actor_model0 = AutoModelForCausalLM.from_pretrained(
+            MODEL0_PATH, quantization_config=bnb,
+            device_map="cuda:0", low_cpu_mem_usage=True,
+        ).eval()
+    else:
+        print("加载 model0 (GPU fp16)...")
+        _actor_model0 = AutoModelForCausalLM.from_pretrained(
+            MODEL0_PATH, torch_dtype=torch.float16,
+            device_map="cuda:0", low_cpu_mem_usage=True,
+        ).eval()
     alloc_all = torch.cuda.memory_allocated(0) / 1024**3
     print(f"  model0 + RM GPU: {alloc_all:.1f} GB")
 
@@ -417,9 +452,23 @@ if __name__ == "__main__":
         sys.exit(1)
 
     if not os.path.isdir(MODEL0_PATH):
-        print(f"[错误] 本地fp16模型未找到: {MODEL0_PATH}")
-        print("  请先运行模型转换")
-        sys.exit(1)
+        print(f"[检测] 本地fp16模型未找到: {MODEL0_PATH}")
+        print("  → 自动运行模型准备脚本...\n")
+
+        # 自动调用 prepare_multibit_models
+        try:
+            from prepare_multibit_models import prepare_fp16_models
+            prepare_fp16_models()
+            print("\n✅ 模型准备完成，继续测试...\n")
+        except Exception as e:
+            print(f"\n❌ 模型准备失败: {e}")
+            print("  请手动运行: python prepare_multibit_models.py")
+            sys.exit(1)
+
+        # 再次检查
+        if not os.path.isdir(MODEL0_PATH):
+            print(f"[错误] 模型准备后仍未找到: {MODEL0_PATH}")
+            sys.exit(1)
 
     # ── 测试文本 ──────────────────────────────────
     test_text_path = os.path.join(MULTIBIT_PROJECT, "watermark_test_text.txt")
