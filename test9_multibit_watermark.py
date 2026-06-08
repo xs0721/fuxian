@@ -206,6 +206,7 @@ def load_multibit_models():
     base_model = AutoModel.from_pretrained(
         RM_PATH, quantization_config=bnb,
         device_map="cuda:0", low_cpu_mem_usage=True,
+        trust_remote_code=True,
     )
     _reward_model = model_utils.RewardModel(base_model, _tokenizer)
     _reward_model.v_head.load_state_dict(
