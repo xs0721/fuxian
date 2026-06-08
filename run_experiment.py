@@ -1477,7 +1477,17 @@ if __name__ == "__main__":
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
-        pbar.close() 
+        pbar.close()
+
+        # ============================================================================
+        # 数据集完成后深度清理内存/显存，防止累积导致OOM
+        # ============================================================================
+        print(f">>> {ds_name} 完成，正在深度清理内存...")
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+        print(f">>> {ds_name} 清理完成")
 
     df = pd.DataFrame(results)
     df.to_csv(CSV_FILENAME, index=False)
