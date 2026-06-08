@@ -145,8 +145,8 @@ def load_detector():
     global detector_tokenizer, target_model
     if not _models_loaded["detector"]:
         print(f"[{device.upper()}] 加载检测器: {TARGET_MODEL}...")
-        detector_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
-        target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
+        detector_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR, trust_remote_code=True)
+        target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR, trust_remote_code=True).to(device)
         _models_loaded["detector"] = True
 
 def load_attacker():
