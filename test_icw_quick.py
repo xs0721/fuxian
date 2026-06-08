@@ -54,6 +54,10 @@ for name, text in test_samples.items():
     z_score = icw_initials.detect_watermark(text)
     print(f"{name:15} | Z-score: {z_score:6.2f} | 文本: {text[:50]}...")
 
+# 保存用于可视化的结果
+z_watermarked_initials = icw_initials.detect_watermark(test_samples["偏向绿名单"])
+z_human_initials = icw_initials.detect_watermark(test_samples["正常文本"])
+
 print("\n【ICW Lexical检测】")
 print("-" * 60)
 sample_with_keywords = "This innovative and advanced intelligent system is sophisticated."
@@ -64,6 +68,10 @@ freq2 = icw_lexical.detect_watermark(sample_without)
 
 print(f"含关键词文本 | 频率: {freq1:.3f} | {sample_with_keywords}")
 print(f"无关键词文本 | 频率: {freq2:.3f} | {sample_without}")
+
+# 保存用于可视化的结果
+z_watermarked_lexical = freq1
+z_human_lexical = freq2
 
 print("\n" + "=" * 80)
 print("ICW关键特性验证:")
