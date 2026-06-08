@@ -13,6 +13,9 @@ def prepare_fp16_models():
     print("准备Multi-bit水印测试所需的模型")
     print("=" * 60)
 
+    # 设置HuggingFace镜像
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
     FP16_DIR = os.path.join(os.path.expanduser("~"), ".cache", "watermark_fp16")
     MODEL0_PATH = os.path.join(FP16_DIR, "model0")
     MODEL1_PATH = os.path.join(FP16_DIR, "model1")
@@ -25,15 +28,20 @@ def prepare_fp16_models():
         return
 
     print("\n使用Qwen2.5-7B-Instruct作为双模型替代")
-    print("这是简化版实现，用于快速测试\n")
+    print("这是简化版实现，用于快速测试")
+    print("使用HF镜像: https://hf-mirror.com\n")
 
     BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+    CACHE_DIR = "/root/autodl-tmp/hf_cache"
 
     # 下载并转换为FP16
     print(f"下载模型: {BASE_MODEL}")
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    print("这可能需要10-30分钟，请耐心等待...\n")
+
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, cache_dir=CACHE_DIR)
     model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
+        cache_dir=CACHE_DIR,
         torch_dtype=torch.float16,
         low_cpu_mem_usage=True
     )
