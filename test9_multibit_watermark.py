@@ -193,7 +193,7 @@ def load_multibit_models():
 
     print(f"[GPU: {VRAM_GB:.1f}GB] 策略: model0 GPU 4-bit + model1 CPU fp16")
     print("加载 tokenizer...")
-    _tokenizer = utils.get_tokenizer('qwen2.5-7b-it')
+    _tokenizer = utils.get_tokenizer('opt-2.7b')
     _tokenizer.padding_side = 'left'
 
     bnb = BitsAndBytesConfig(
@@ -258,7 +258,7 @@ def embed_multi_bit_watermark(text, key=None):
     if key is None:
         key = FULL_KEY
 
-    prompt = utils.gen_para_prompt(text, prompt_style='qwen', tokenizer=_tokenizer)
+    prompt = utils.gen_para_prompt(text, prompt_style='custom', tokenizer=_tokenizer)
     toks = _tokenizer(prompt, max_length=MAX_INP_LEN, return_tensors='pt')
     prompt_length = toks['input_ids'].shape[1]
 

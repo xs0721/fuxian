@@ -110,6 +110,20 @@ def get_tokenizer(model_name):
             assert tokenizer.decode([tokenizer.end_of_turn_token]) == '<end_of_turn>'
         else:
             tokenizer.end_of_turn_token = None
+    elif "opt" in model_name:
+        # OPT 模型支持
+        if model_name == "opt-125m":
+            model_path = "facebook/opt-125m"
+        elif model_name == "opt-2.7b":
+            model_path = "facebook/opt-2.7b"
+        elif model_name == "opt-6.7b":
+            model_path = "facebook/opt-6.7b"
+        else:
+            raise NotImplementedError(f"OPT model {model_name} not supported")
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = 'right'
+        tokenizer.end_of_turn_token = None
     else:
         raise NotImplementedError()
     return tokenizer
