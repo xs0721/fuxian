@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 模型准备脚本：为test9创建简化版模型
-使用Qwen2.5-7B-Instruct作为model0和model1的替代
+使用facebook/opt-2.7b作为model0和model1的替代
 """
 import os
 import sys
@@ -27,16 +27,16 @@ def prepare_fp16_models():
         print("模型已存在，跳过下载")
         return
 
-    print("\n使用Qwen2.5-7B-Instruct作为双模型替代")
+    print("\n使用facebook/opt-2.7b作为双模型替代")
     print("这是简化版实现，用于快速测试")
     print("使用HF镜像: https://hf-mirror.com\n")
 
-    BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+    BASE_MODEL = "facebook/opt-2.7b"
     CACHE_DIR = "/root/autodl-tmp/hf_cache"
 
     # 下载并转换为FP16
     print(f"下载模型: {BASE_MODEL}")
-    print("这可能需要10-30分钟，请耐心等待...\n")
+    print("这可能需要5-15分钟，请耐心等待...\n")
 
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, cache_dir=CACHE_DIR)
     model = AutoModelForCausalLM.from_pretrained(
