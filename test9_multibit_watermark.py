@@ -147,9 +147,13 @@ warnings.filterwarnings("ignore")
 
 # transformers内部也引用safe_open, 需补丁
 import transformers.modeling_utils as _mu
-import transformers.core_model_loading as _cml
+try:
+    import transformers.core_model_loading as _cml
+    _cml.safe_open = __import__('safetensors').safe_open
+except (ImportError, ModuleNotFoundError):
+    # 旧版本transformers没有core_model_loading模块
+    pass
 _mu.safe_open = __import__('safetensors').safe_open
-_cml.safe_open = __import__('safetensors').safe_open
 
 # ── 全局配置 ──────────────────────────────────────
 device = "cuda" if torch.cuda.is_available() else "cpu"
