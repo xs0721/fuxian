@@ -42,8 +42,7 @@ def prepare_fp16_models():
     model = AutoModelForCausalLM.from_pretrained(
         BASE_MODEL,
         cache_dir=CACHE_DIR,
-        torch_dtype=torch.float16,
-        low_cpu_mem_usage=True
+        torch_dtype=torch.float16
     )
 
     print(f"\n保存model0到: {MODEL0_PATH}")
