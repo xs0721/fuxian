@@ -40,7 +40,7 @@ CACHE_DIR = "E:/Your_Cloud_Drive/hf_cache"
 TARGET_MODEL = "facebook/opt-125m"
 ATTACKER_MODEL = "t5-small"
 CSV_FILENAME = "watermark_benchmark_results.csv"
-GEMMA_DIR = "E:/Your_Cloud_Drive/hf_cache/LLM-Research/gemma-2-2b-it"
+GEMMA_DIR = "google/gemma-2-2b-it"  # 使用HuggingFace仓库名，自动下载
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 vocab_size = 50272
