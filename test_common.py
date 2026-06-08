@@ -3,6 +3,12 @@ import sys
 import os
 import hashlib
 
+# ============================================================================
+# 自动设置环境变量 - 无需手动export
+# ============================================================================
+os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'  # HuggingFace镜像加速
+print(f"✅ 已自动设置 HF_ENDPOINT={os.environ['HF_ENDPOINT']}")
+
 # 强制 UTF-8 编码, 解决 Windows 终端 GBK 显示乱码问题
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
