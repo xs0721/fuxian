@@ -158,6 +158,11 @@ ax1.set_title('Test 17: Learnability of LLM Watermarks (ICLR 2024)\n'
               fontsize=11, fontweight='bold', pad=15)
 ax1.set_ylabel('Z-Score', fontsize=12); ax1.set_xlabel('')
 ax1.legend(loc='upper right'); ax1.tick_params(axis='x', rotation=8)
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 
 # 训练损失曲线
 ax2.plot(range(1, len(losses) + 1), losses, marker='o', color='#9467bd', linewidth=2)

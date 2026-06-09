@@ -151,6 +151,11 @@ ax1.set_title('Test 14: Multiple Keys Watermark Dilution\n'
               fontsize=12, fontweight='bold', pad=15)
 ax1.set_ylabel('Z-Score', fontsize=12); ax1.set_xlabel('')
 ax1.legend(loc='upper right'); ax1.tick_params(axis='x', rotation=10)
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 
 table_data = summary.reset_index()
 ax2.axis('off'); ax2.set_title('Mean Z-Score', fontsize=13, fontweight='bold', pad=10)

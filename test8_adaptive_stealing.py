@@ -32,7 +32,14 @@ def detect_kgw(text, tokenizer, vocab_size, gamma=KGW_GAMMA,
         return 0.0
     green_count, total_count = 0, 0
     for i in range(prefix_length, len(tokens)):
+        # 跳过超出 vocab_size 的 token
+        if tokens[i] >= vocab_size:
+            continue
+        # 检查上下文 tokens 是否也在范围内
         ctx = tokens[i - prefix_length : i]
+        if any(t >= vocab_size for t in ctx):
+            continue
+
         if _get_green_mask(ctx, vocab_size, gamma, hash_key)[tokens[i]].item():
             green_count += 1
         total_count += 1
@@ -66,7 +73,7 @@ class WatermarkedOracle:
         return torch.multinomial(weights / weights.sum(), 1).item()
 
 # ============================================================
-# 前缀频率估计: 从语料中统计高频3-gram前缀
+# 前缀频率估计: 从语料统计高频3-gram前缀
 #   自适应窃取的核心: 优先查询高频前缀 → 有限预算下最大化覆盖
 # ============================================================
 def estimate_prefix_freq(texts, tokenizer, prefix_length=KGW_PREFIX_LENGTH):
@@ -216,9 +223,15 @@ ax8_2.grid(True, alpha=0.3)
 
 # 右表: 数据汇总
 summary_table_8 = df_as.round(3).reset_index()
-summary_table_8.rename(columns={'Queries': 'Budget\n(Z-Score)'}, inplace=True)
-table8_data = summary_table_8[['Budget\n(Z-Score)', 'Random_Accuracy', 'Adaptive_Accuracy',
-                                'Random_ZScore', 'Adaptive_ZScore']]
+# 缩短列名以避免挤压
+summary_table_8.rename(columns={
+    'Queries': 'Budget',
+    'Random_Accuracy': 'Rand_Acc',
+    'Adaptive_Accuracy': 'Adap_Acc',
+    'Random_ZScore': 'Rand_Z',
+    'Adaptive_ZScore': 'Adap_Z'
+}, inplace=True)
+table8_data = summary_table_8[['Budget', 'Rand_Acc', 'Adap_Acc', 'Rand_Z', 'Adap_Z']]
 # ax8_2 用于汇总表, 重新调整布局
 fig8.delaxes(ax8_2)
 ax8_2 = fig8.add_subplot(gs8[1])
@@ -227,8 +240,8 @@ ax8_2.set_title('Data Summary', fontsize=13, fontweight='bold', pad=10)
 tab8 = ax8_2.table(cellText=table8_data.values, colLabels=table8_data.columns,
                     loc='center', cellLoc='center')
 tab8.auto_set_font_size(False)
-tab8.set_fontsize(10)
-tab8.scale(1, 2.5)
+tab8.set_fontsize(9)  # 减小字体
+tab8.scale(1.2, 2.5)  # 增加宽度
 
 plt.tight_layout()
 plt.savefig("attack_8_adaptive_stealing.png", dpi=300, bbox_inches='tight')

@@ -1,33 +1,33 @@
 """测试7: B4 黑盒代理模型盲擦除攻击 (NAACL 2025)"""
 from test_common import *
+from test_common import _get_local_model_path  # 显式导入私有函数
+import time
 
 print_test_header("B4 黑盒代理模型盲擦除攻击 (NAACL 2025)")
 
-# 卸载 OPT-125m 模型权重释放 VRAM（B4 仅需 tokenizer）
+# test7 特殊处理：需要用 OPT 作为检测器（Gemma2 有 CUDA 兼容性问题）
+print(">>> test7: 重新加载 OPT-1.3b 作为检测器（替换 Gemma）...")
 if target_model is not None:
-    target_model.cpu()
-torch.cuda.empty_cache()
+    del target_model
+    del detector_tokenizer
+    torch.cuda.empty_cache()
 
-print(">>> 加载 B4 所需 Gemma-2-2B 模型 (共享权重节省 VRAM)...")
-try:
-    b4_model = AutoModelForCausalLM.from_pretrained(
-        GEMMA_DIR, torch_dtype=torch.bfloat16, cache_dir=CACHE_DIR).to(device)
-    b4_model.eval()
-    # B4 三个角色共用同一份权重，通过独立 KV-cache 实现分工
-    paraphrase_model = b4_model
-    amateur_model = b4_model
-    origin_model = b4_model
-    b4_tokenizer = AutoTokenizer.from_pretrained(GEMMA_DIR, cache_dir=CACHE_DIR)
-    b4_amateur_tokenizer = b4_tokenizer
-    b4_tokenizer.padding_side = "left"
-    print(">>> B4 模型加载完成")
-except Exception as e:
-    print(f"B4 模型加载失败: {e}")
-    print("⚠️  跳过 test7 (B4攻击)，继续其他测试...")
-    print("说明: Gemma-2-2b模型较大(~5GB)，需要网络连接或足够显存")
-    print(">>> 测试7跳过 <<<")
-    import sys
-    sys.exit(0)
+opt_detector_path = _get_local_model_path("facebook/opt-1.3b", CACHE_DIR)
+print(f"    → 加载 OPT-1.3b: {opt_detector_path}")
+detector_tokenizer = AutoTokenizer.from_pretrained(opt_detector_path, cache_dir=CACHE_DIR)
+target_model = AutoModelForCausalLM.from_pretrained(opt_detector_path, cache_dir=CACHE_DIR).to(device)
+print(f"    ✅ OPT 检测器加载完成")
+
+print(">>> 加载 B4 所需 OPT-1.3b 模型（与检测器共享权重）...")
+# B4 的三个角色直接复用检测器模型，节省显存
+b4_model = target_model
+b4_tokenizer = detector_tokenizer
+paraphrase_model = target_model
+amateur_model = target_model
+origin_model = target_model
+b4_amateur_tokenizer = detector_tokenizer
+b4_tokenizer.padding_side = "left"
+print(">>> B4 模型配置完成（共享检测器权重）")
 
 b4_results = []
 sample_b4_df = df.dropna(subset=[f"Text_{algorithms[0]}"]).sample(n=min(20, len(df)), random_state=42)
@@ -38,21 +38,61 @@ for algo in algorithms:
     original_texts = sample_b4_df[f"Text_{algo}"].tolist()
     print(f"\n>>> 处理算法: {algo}, 样本数: {len(original_texts)}")
 
+    # === 步骤1: 计算攻击前Z-score ===
+    print(f"  [1/3] 计算攻击前Z-score... ", end='', flush=True)
     for text in original_texts:
         z_before = detect_watermark(text, algo, detector_tokenizer, vocab_size)
         b4_results.append({"Algorithm": algo, "State": "1_Before B4", "Z_Score": z_before})
+    print(f"✓ 完成")
+
+    # === 步骤2: B4攻击（逐样本显示进度） ===
+    print(f"  [2/3] B4攻击 (逐样本处理):")
+    attacked_texts = []
+    attack_start_time = time.time()
 
     try:
-        attacked_texts = b4_proxy_erasure_attack(
-            texts=original_texts, paraphrase_model=paraphrase_model,
-            amateur_model=amateur_model, origin_model=origin_model,
-            tokenizer=b4_tokenizer, amateur_tokenizer=b4_amateur_tokenizer,
-            prompt_id=4, num_beams=4, max_new_tokens=200, coef=1.0, batch_size=1)
-        print(f"  B4 攻击完成, 结果数: {len(attacked_texts)}")
+        for sample_idx, text in enumerate(original_texts):
+            sample_start = time.time()
+            progress_pct = (sample_idx + 1) / len(original_texts) * 100
 
+            print(f"    [{sample_idx+1:2d}/{len(original_texts):2d}] ({progress_pct:5.1f}%) ", end='', flush=True)
+
+            try:
+                result = b4_proxy_erasure_attack(
+                    texts=[text],
+                    paraphrase_model=paraphrase_model,
+                    amateur_model=amateur_model,
+                    origin_model=origin_model,
+                    tokenizer=b4_tokenizer,
+                    amateur_tokenizer=b4_amateur_tokenizer,
+                    prompt_id=4, num_beams=4, max_new_tokens=200, coef=1.0, batch_size=1)
+
+                attacked_texts.extend(result)
+
+                elapsed = time.time() - sample_start
+                total_elapsed = time.time() - attack_start_time
+                avg_time = total_elapsed / (sample_idx + 1)
+                remaining = avg_time * (len(original_texts) - sample_idx - 1)
+
+                print(f"✓ {elapsed:5.1f}s | 平均:{avg_time:5.1f}s | 剩余:{remaining/60:.1f}min", flush=True)
+
+                # 每5个样本清理一次显存
+                if (sample_idx + 1) % 5 == 0:
+                    torch.cuda.empty_cache()
+
+            except Exception as e:
+                print(f"✗ 失败: {str(e)[:40]}", flush=True)
+                continue
+
+        total_time = time.time() - attack_start_time
+        print(f"  ✓ B4攻击完成! 总耗时:{total_time/60:.1f}分钟, 成功:{len(attacked_texts)}/{len(original_texts)}")
+
+        # === 步骤3: 计算攻击后Z-score ===
+        print(f"  [3/3] 计算攻击后Z-score... ", end='', flush=True)
         for text in attacked_texts:
             z_after = detect_watermark(text, algo, detector_tokenizer, vocab_size)
             b4_results.append({"Algorithm": algo, "State": "2_After B4", "Z_Score": z_after})
+        print(f"✓ 完成")
     except Exception as e:
         import traceback
         print(f"  B4 攻击失败跳过: {e}")

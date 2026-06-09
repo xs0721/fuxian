@@ -1,8 +1,31 @@
 import pyarrow  # 必须最先导入, 避免与Anaconda的pyarrow DLL冲突
+import os
+import sys
+import warnings
+
+# 全局忽略所有 FutureWarning（包括 huggingface_hub）
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*resume_download.*")
+
+# ================= ===================================
+# 网络配置（HuggingFace 镜像加速）
+# ================= ===================================
+# 对于数据集加载：强制离线模式，避免网络超时
+os.environ["HF_DATASETS_OFFLINE"] = "1"  # 强制数据集离线
+os.environ["HF_HUB_OFFLINE"] = "1"       # 强制Hub离线
+
+# 对于模型加载：允许在线（如果本地没有）
+os.environ["TRANSFORMERS_OFFLINE"] = "0"
+if "HF_ENDPOINT" not in os.environ:
+    os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+
+# 忽略 HuggingFace 的 FutureWarning
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="huggingface_hub")
+
 import torch
 import torch.nn.functional as F
 import math
-import os
 import random
 import numpy as np
 from tqdm import tqdm
@@ -11,8 +34,13 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, LogitsProcessor, L
 # ================= ===================================
 # 1. 基础配置（实验参数集中管理）
 # ================= ===================================
-CACHE_DIR = "E:/Your_Cloud_Drive/hf_cache"
-MODEL_NAME = "facebook/opt-125m"
+# 跨平台缓存目录：Windows用本地路径，Linux用/root/autodl-tmp
+if os.name == 'nt':  # Windows
+    CACHE_DIR = "E:/Your_Cloud_Drive/hf_cache"
+else:  # Linux/Mac
+    CACHE_DIR = os.path.expanduser("~/autodl-tmp/hf_cache") if os.path.exists(os.path.expanduser("~/autodl-tmp")) else "./hf_cache"
+os.makedirs(CACHE_DIR, exist_ok=True)
+MODEL_NAME = "facebook/opt-1.3b"  # 使用服务器上已有的 1.3b 模型（更好的效果）
 TEST_SAMPLE_SIZE = 200  # 快速测试用, 正式实验改为 200
 DELTA_VALUE = 2.0
 PROMPT_LENGTH = 30
@@ -1401,7 +1429,37 @@ if __name__ == "__main__":
     for ds_name, ds_info in DATASET_CONFIGS.items():
         print(f"\n>>> 正在连接并处理数据集: {ds_name} <<<")
         try:
-            dataset = load_dataset(ds_info["path"], ds_info["name"], split="train", streaming=True, cache_dir=CACHE_DIR)
+            # 特殊处理：C4数据集直接从本地文件加载
+            if ds_name == "C4_News":
+                import json
+                c4_file = os.path.join(CACHE_DIR, "datasets--allenai--c4", "realnewslike-train.jsonl")
+                if os.path.exists(c4_file):
+                    print(f"  从本地文件加载C4: {c4_file}")
+                    c4_data = []
+                    with open(c4_file, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            item = json.loads(line)
+                            c4_data.append({"text": item["text"]})
+
+                    # 创建一个简单的迭代器
+                    dataset = iter(c4_data)
+                    print(f"  ✓ C4数据集加载成功: {len(c4_data)} 条记录")
+                else:
+                    print(f"  ✗ C4文件不存在: {c4_file}")
+                    continue
+            else:
+                # 其他数据集使用正常加载
+                from datasets import DownloadMode
+                dataset = load_dataset(
+                    ds_info["path"],
+                    ds_info["name"],
+                    split="train",
+                    streaming=False,
+                    cache_dir=CACHE_DIR,
+                    download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+                )
+                # 转为迭代器
+                dataset = iter(dataset)
         except Exception as e:
             print(f"数据集 {ds_name} 加载失败，跳过。报错: {e}")
             continue
@@ -1425,43 +1483,51 @@ if __name__ == "__main__":
             attn_mask = inputs["attention_mask"]
 
             for algo_name, processor in algorithms.items():
-                torch.manual_seed(seed)
+                try:
+                    torch.manual_seed(seed)
 
-                if algo_name == "Gumbel":
-                    out_ids, xi, offset = generate_gumbel(
-                        model, tokenizer, inputs["input_ids"], attn_mask,
-                        GENERATE_LENGTH, seed, model.config.vocab_size, device)
-                    text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
-                    _GUMBEL_STATE[text] = {'xi': xi, 'offset': offset, 'seed': seed}
-                elif algo_name == "Transform":
-                    out_ids, xi, pi, offset = generate_transform(
-                        model, tokenizer, inputs["input_ids"], attn_mask,
-                        GENERATE_LENGTH, seed, model.config.vocab_size, device)
-                    text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
-                    _TRANSFORM_STATE[text] = {'xi': xi, 'pi': pi, 'offset': offset, 'seed': seed}
-                elif algo_name == "WaterMax":
-                    prompt_text = tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)
-                    texts = generate_watermax(
-                        model, tokenizer, [prompt_text], GENERATE_LENGTH,
-                        num_seq=2, n_splits=1, ngram=3, seed=seed, device=device)
-                    text = texts[0]
-                    _WATERMAX_STATE[text] = {'ngram': 3, 'split_len': GENERATE_LENGTH // 2, 'seed': seed}
-                else:
-                    generate_kwargs = {**inputs, "max_new_tokens": GENERATE_LENGTH, "do_sample": True, "temperature": 0.7}
-                    if processor is not None:
-                        generate_kwargs["logits_processor"] = processor
-                    outputs = model.generate(**generate_kwargs)
-                    text = tokenizer.decode(outputs[0], skip_special_tokens=True)
+                    if algo_name == "Gumbel":
+                        out_ids, xi, offset = generate_gumbel(
+                            model, tokenizer, inputs["input_ids"], attn_mask,
+                            GENERATE_LENGTH, seed, model.config.vocab_size, device)
+                        text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
+                        _GUMBEL_STATE[text] = {'xi': xi, 'offset': offset, 'seed': seed}
+                    elif algo_name == "Transform":
+                        out_ids, xi, pi, offset = generate_transform(
+                            model, tokenizer, inputs["input_ids"], attn_mask,
+                            GENERATE_LENGTH, seed, model.config.vocab_size, device)
+                        text = tokenizer.decode(out_ids[0], skip_special_tokens=True)
+                        _TRANSFORM_STATE[text] = {'xi': xi, 'pi': pi, 'offset': offset, 'seed': seed}
+                    elif algo_name == "WaterMax":
+                        prompt_text = tokenizer.decode(inputs["input_ids"][0], skip_special_tokens=True)
+                        texts = generate_watermax(
+                            model, tokenizer, [prompt_text], GENERATE_LENGTH,
+                            num_seq=2, n_splits=1, ngram=3, seed=seed, device=device)
+                        text = texts[0]
+                        _WATERMAX_STATE[text] = {'ngram': 3, 'split_len': GENERATE_LENGTH // 2, 'seed': seed}
+                    else:
+                        generate_kwargs = {**inputs, "max_new_tokens": GENERATE_LENGTH, "do_sample": True, "temperature": 0.7}
+                        if processor is not None:
+                            generate_kwargs["logits_processor"] = processor
+                        outputs = model.generate(**generate_kwargs)
+                        text = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-                row_result[f"Z_Score_{algo_name}"] = round(detect_watermark(text, algo_name, tokenizer, model.config.vocab_size), 3)
-                row_result[f"PPL_{algo_name}"] = round(calculate_ppl(text, model, tokenizer, device), 3)
+                    row_result[f"Z_Score_{algo_name}"] = round(detect_watermark(text, algo_name, tokenizer, model.config.vocab_size), 3)
+                    row_result[f"PPL_{algo_name}"] = round(calculate_ppl(text, model, tokenizer, device), 3)
 
-                # PPL计算后立即清理显存，防止碎片化
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
+                    # PPL计算后立即清理显存，防止碎片化
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
 
-                if algo_name != "Natural":
-                    row_result[f"Text_{algo_name}"] = text
+                    if algo_name != "Natural":
+                        row_result[f"Text_{algo_name}"] = text
+
+                except Exception as e:
+                    print(f"\n⚠️  算法 {algo_name} 在样本 {sample_count + 1} 执行失败: {e}")
+                    row_result[f"Z_Score_{algo_name}"] = 0.0
+                    row_result[f"PPL_{algo_name}"] = float('inf')
+                    if algo_name != "Natural":
+                        row_result[f"Text_{algo_name}"] = "[ERROR]"
 
                 # 每个算法测试后清理显存，防止累积
                 if torch.cuda.is_available():
@@ -1490,11 +1556,24 @@ if __name__ == "__main__":
         print(f">>> {ds_name} 清理完成")
 
     df = pd.DataFrame(results)
+
+    # 检查是否有数据
+    if df.empty:
+        print("\n❌ 错误：没有收集到任何数据！所有数据集加载都失败了。")
+        print("提示：检查网络连接或设置 HF_DATASETS_OFFLINE=0")
+        exit(1)
+
     df.to_csv(CSV_FILENAME, index=False)
     print(f"\n=== 多维数据计算评估完成！表格已保存至 {CSV_FILENAME} ===")
 
     metrics_cols = [col for col in df.columns if "Z_Score" in col or "PPL" in col]
-    print("\n【各数据集下的算法平均表现汇总】:")
-    print(df.groupby("Dataset")[metrics_cols].mean())
+
+    # 检查是否有Dataset列
+    if "Dataset" in df.columns and len(df["Dataset"].unique()) > 1:
+        print("\n【各数据集下的算法平均表现汇总】:")
+        print(df.groupby("Dataset")[metrics_cols].mean())
+    else:
+        print("\n【整体算法平均表现汇总】:")
+        print(df[metrics_cols].mean())
 
     generate_benchmark_plots(CSV_FILENAME)

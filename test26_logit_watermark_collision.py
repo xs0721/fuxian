@@ -146,6 +146,11 @@ def main():
     axes[1].set_title("False-attribution score distribution")
     axes[1].set_ylabel("KGW detector z-score")
     axes[1].legend(frameon=False)
+    # X 轴标签旋转
+    axes[1].tick_params(axis='x', rotation=45)
+    for label in axes[1].get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha('right')
 
     fig.tight_layout()
     fig.savefig(OUTPUT, dpi=120)

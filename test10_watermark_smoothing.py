@@ -145,6 +145,11 @@ ax1.set_title('Test 10: Hard Binary (KGW) vs Continuous Smoothing\n'
 ax1.set_ylabel('Z-Score', fontsize=13)
 ax1.set_xlabel('')
 ax1.legend(loc='upper right')
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 
 table_data = summary_pivot.reset_index()
 table_data.rename(columns={'Algorithm': 'Strategy'}, inplace=True)

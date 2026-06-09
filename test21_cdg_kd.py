@@ -23,17 +23,43 @@ GitHub: https://github.com/xinykou/CDG-KD
 
 from test_common import *
 
+# 显存优化：清理显存
+import gc
+gc.collect()
+torch.cuda.empty_cache()
+
+# 添加缺失的函数定义
+def detect_kgw_watermark(text, tokenizer, vocab_size, gamma=0.5, hash_key=15485863):
+    """KGW水印检测"""
+    return detect_watermark(text, "KGW", tokenizer, vocab_size, gamma=gamma, secret_key=hash_key)
+
+def calculate_perplexity(text, model, tokenizer):
+    """计算困惑度"""
+    if not text or not text.strip():
+        return float('inf')
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(model.device)
+    with torch.no_grad():
+        outputs = model(**inputs, labels=inputs["input_ids"])
+        loss = outputs.loss
+    return torch.exp(loss).item() if loss is not None else float('inf')
+
 print("=" * 80)
 print("Test 21: CDG-KD对比解码引导知识蒸馏攻击 (KBS 2025)")
 print("=" * 80)
 
 # 加载教师模型（带水印）和学生模型
 print("\n正在加载模型...")
-teacher_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
-teacher_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+# 复用已加载的模型
+if target_model is None:
+    teacher_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
+    teacher_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+else:
+    teacher_model = target_model
+    teacher_tokenizer = detector_tokenizer
+    print(f"使用已加载的模型: {TARGET_MODEL}")
 
 # 学生模型（实际应该是相同架构但参数未训练，这里用相同模型简化）
-student_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
+student_model = teacher_model  # 简化：复用同一模型
 
 print("✅ 模型加载完成")
 
@@ -45,7 +71,17 @@ ALPHA_VALUES = [-1.5, -0.5, 0.0, 0.5, 1.5]  # 对比系数
 
 # 加载测试数据
 df = pd.read_csv(CSV_FILENAME)
-test_prompts = df['prompt'].head(30).tolist()
+# 修复：从Text_KGW生成prompts
+if 'Text_KGW' in df.columns:
+    test_texts = df['Text_KGW'].dropna().head(30).tolist()
+    test_prompts = [" ".join(str(t).split()[:20]) for t in test_texts]
+else:
+    test_prompts = [
+        "The quick brown fox jumps over",
+        "Machine learning is transforming",
+        "Climate change poses significant"
+    ] * 10
+    test_prompts = test_prompts[:30]
 
 print(f"\n实验设置:")
 print(f"  测试样本数: {len(test_prompts)}")
@@ -144,37 +180,46 @@ for alpha in ALPHA_VALUES:
 # 可视化
 results_df = pd.DataFrame(results)
 
-fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-fig.suptitle('CDG-KD对比解码引导蒸馏攻击', fontsize=16, fontweight='bold')
+# 设置字体避免乱码
+plt.rcParams['font.family'] = 'DejaVu Sans'
+plt.rcParams['axes.unicode_minus'] = False
 
-# 1. Z-score随α变化
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+fig.suptitle('CDG-KD Contrastive Decoding Guided Knowledge Distillation Attack', fontsize=16, fontweight='bold')
+
+# 1. Z-score vs α
 ax1 = axes[0, 0]
 ax1.errorbar(results_df['alpha'], results_df['avg_z_score'], yerr=results_df['std_z_score'],
              marker='o', linewidth=2, markersize=8, capsize=5, color='#e74c3c')
-ax1.axhline(y=4.0, color='green', linestyle='--', label='检测阈值')
+ax1.axhline(y=4.0, color='green', linestyle='--', label='Detection Threshold')
 ax1.axvline(x=0, color='gray', linestyle=':', alpha=0.5)
-ax1.fill_between(results_df['alpha'], 0, 4.0, alpha=0.1, color='red', label='未检测区')
-ax1.fill_between(results_df['alpha'], 4.0, 10, alpha=0.1, color='green', label='检测区')
-ax1.set_xlabel('对比系数 α', fontsize=12)
-ax1.set_ylabel('平均 Z-score', fontsize=12)
-ax1.set_title('水印强度控制', fontsize=13, fontweight='bold')
+ax1.fill_between(results_df['alpha'], 0, 4.0, alpha=0.1, color='red', label='Undetected')
+ax1.fill_between(results_df['alpha'], 4.0, 10, alpha=0.1, color='green', label='Detected')
+ax1.set_xlabel('Contrastive Coefficient α', fontsize=12)
+ax1.set_ylabel('Average Z-score', fontsize=12)
+ax1.set_title('Watermark Strength Control', fontsize=13, fontweight='bold')
 ax1.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax1.grid(True, alpha=0.3)
 
-# 2. 检测率随α变化
+# 2. Detection Rate vs α
 ax2 = axes[0, 1]
 colors = ['#27ae60' if a < 0 else ('#e74c3c' if a > 0 else '#95a5a6') for a in results_df['alpha']]
 ax2.bar(results_df['alpha'].astype(str), results_df['detection_rate'], color=colors, alpha=0.8)
 ax2.axhline(y=0.5, color='black', linestyle='--', alpha=0.3)
-ax2.set_xlabel('对比系数 α', fontsize=12)
-ax2.set_ylabel('检测率', fontsize=12)
-ax2.set_title('双向攻击效果', fontsize=13, fontweight='bold')
+ax2.set_xlabel('Contrastive Coefficient α', fontsize=12)
+ax2.set_ylabel('Detection Rate', fontsize=12)
+ax2.set_title('Bi-directional Attack Effect', fontsize=13, fontweight='bold')
 ax2.grid(axis='y', alpha=0.3)
 ax2.set_ylim(0, 1)
 
-# 3. 攻击模式对比
+# 3. Attack Mode Comparison
 ax3 = axes[1, 0]
-modes = ['伪造(α<0)', '标准(α=0)', '中和(α>0)']
+modes = ['Spoofing(α<0)', 'Standard(α=0)', 'Neutralization(α>0)']
 neutralization_rate = results_df[results_df['alpha'] > 0]['detection_rate'].mean()
 spoofing_rate = results_df[results_df['alpha'] < 0]['detection_rate'].mean()
 standard_rate = results_df[results_df['alpha'] == 0]['detection_rate'].mean()
@@ -183,22 +228,27 @@ mode_rates = [spoofing_rate, standard_rate, neutralization_rate]
 mode_colors = ['#27ae60', '#95a5a6', '#e74c3c']
 
 ax3.bar(modes, mode_rates, color=mode_colors, alpha=0.8)
-ax3.set_ylabel('检测率', fontsize=12)
-ax3.set_title('三种模式效果对比', fontsize=13, fontweight='bold')
+ax3.set_ylabel('Detection Rate', fontsize=12)
+ax3.set_title('Three Mode Comparison', fontsize=13, fontweight='bold')
 ax3.grid(axis='y', alpha=0.3)
 ax3.set_ylim(0, 1)
 
-# 4. 困惑度 vs 水印强度
+# 4. Perplexity vs Watermark Strength
 ax4 = axes[1, 1]
 scatter = ax4.scatter(results_df['avg_z_score'], results_df['avg_ppl'],
                       c=results_df['alpha'], cmap='coolwarm', s=150, alpha=0.7)
-ax4.axvline(x=4.0, color='red', linestyle='--', label='检测阈值')
-ax4.set_xlabel('Z-score (水印强度)', fontsize=12)
-ax4.set_ylabel('困惑度 (文本质量)', fontsize=12)
-ax4.set_title('质量-安全权衡', fontsize=13, fontweight='bold')
+ax4.axvline(x=4.0, color='red', linestyle='--', label='Detection Threshold')
+ax4.set_xlabel('Z-score (Watermark Strength)', fontsize=12)
+ax4.set_ylabel('Perplexity (Text Quality)', fontsize=12)
+ax4.set_title('Quality-Security Tradeoff', fontsize=13, fontweight='bold')
 ax4.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax4.grid(True, alpha=0.3)
-plt.colorbar(scatter, ax=ax4, label='α值')
+plt.colorbar(scatter, ax=ax4, label='α value')
 
 plt.tight_layout()
 plt.savefig('attack_21_cdg_kd.png', dpi=300, bbox_inches='tight')
@@ -210,10 +260,14 @@ print("论文复现对比 (Yi et al., KBS 2025):")
 print("="*80)
 print(f"{'指标':<35} {'本实验':<20} {'论文报告':<20}")
 print("-"*80)
-print(f"{'标准检测率(α=0)':<35} {standard_rate:.1%:<20} {'~70%':<20}")
-print(f"{'中和后检测率(α>0)':<35} {neutralization_rate:.1%:<20} {'<10%':<20}")
-print(f"{'伪造成功率(α<0)':<35} {spoofing_rate:.1%:<20} {'~85%':<20}")
-print(f"{'困惑度保持':<35} {results_df['avg_ppl'].mean():.1f:<20} {'<15':<20}")
+standard_str = f"{standard_rate:.1%}"
+neutralization_str = f"{neutralization_rate:.1%}"
+spoofing_str = f"{spoofing_rate:.1%}"
+ppl_str = f"{results_df['avg_ppl'].mean():.1f}"
+print(f"{'标准检测率(α=0)':<35} {standard_str:<20} {'~70%':<20}")
+print(f"{'中和后检测率(α>0)':<35} {neutralization_str:<20} {'<10%':<20}")
+print(f"{'伪造成功率(α<0)':<35} {spoofing_str:<20} {'~85%':<20}")
+print(f"{'困惑度保持':<35} {ppl_str:<20} {'<15':<20}")
 print("="*80)
 print("✅ Test 21 完成")
 print("\n关键发现:")

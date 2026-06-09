@@ -221,6 +221,11 @@ def main():
     axes[0].set_title("Third-party text-only score")
     axes[0].set_ylabel("ensemble z-like score")
     axes[0].legend(frameon=False)
+    # X 轴标签旋转
+    axes[0].tick_params(axis='x', rotation=45)
+    for label in axes[0].get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha('right')
 
     auc_labels = ["Overall"] + summary["family"].tolist()
     auc_values = [overall_auc] + summary["auc"].tolist()
@@ -228,6 +233,11 @@ def main():
     axes[1].set_ylim(0.0, 1.02)
     axes[1].set_title("AUC by detector family")
     axes[1].set_ylabel("AUC")
+    # X 轴标签旋转
+    axes[1].tick_params(axis='x', rotation=45)
+    for label in axes[1].get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha('right')
     for idx, value in enumerate(auc_values):
         if math.isfinite(value):
             axes[1].text(idx, value + 0.02, f"{value:.2f}", ha="center", va="bottom", fontsize=9)

@@ -21,6 +21,27 @@ GitHub: https://github.com/zwhe99/X-SIR
 """
 
 from test_common import *
+import test_common  # 导入模块本身，用于访问其全局变量
+
+# 显存优化
+import gc
+gc.collect()
+torch.cuda.empty_cache()
+
+# 添加缺失的函数定义
+def detect_kgw_watermark(text, tokenizer, vocab_size, gamma=0.5, hash_key=15485863):
+    """KGW水印检测"""
+    return detect_watermark(text, "KGW", tokenizer, vocab_size, gamma=gamma, secret_key=hash_key)
+
+def calculate_perplexity(text, model, tokenizer):
+    """计算困惑度"""
+    if not text or not text.strip():
+        return float('inf')
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(model.device)
+    with torch.no_grad():
+        outputs = model(**inputs, labels=inputs["input_ids"])
+        loss = outputs.loss
+    return torch.exp(loss).item() if loss is not None else float('inf')
 
 print("=" * 80)
 print("Test 22: X-SIR跨语言语义一致性测试 (ACL 2024)")
@@ -28,16 +49,25 @@ print("=" * 80)
 
 # 加载模型
 print("\n正在加载模型...")
-target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
-target_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+# 复用已加载的模型
+if target_model is None:
+    target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
+    target_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+else:
+    target_tokenizer = detector_tokenizer
+    print(f"使用已加载的模型: {TARGET_MODEL}")
 
 # 改写模型（模拟翻译）
-paraphraser = AutoModelForSeq2SeqLM.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR).to(device)
-para_tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR)
+print("\n正在加载改写模型...")
+load_attacker()
+# 使用模块引用访问全局变量
+if test_common.attacker_model is None or test_common.attacker_tokenizer is None:
+    raise RuntimeError(f"❌ 改写模型加载失败！attacker_model={test_common.attacker_model}, attacker_tokenizer={test_common.attacker_tokenizer}")
+paraphraser = test_common.attacker_model
+para_tokenizer = test_common.attacker_tokenizer
+print(f"✅ 改写模型加载成功: {ATTACKER_MODEL}")
+print("✅ 所有模型加载完成")
 
-print("✅ 模型加载完成")
-
-# 测试提示词
 test_prompts = [
     "The quick brown fox jumps over the lazy dog.",
     "Machine learning is revolutionizing artificial intelligence.",
@@ -171,32 +201,46 @@ print(f"  平均一致性: {avg_xsir_consistency:.2%}")
 print(f"\n📈 X-SIR相对KGW的一致性提升: {improvement:+.1f}%")
 
 # 可视化
+# 设置字体避免乱码
+plt.rcParams["font.family"] = "DejaVu Sans"
+plt.rcParams["axes.unicode_minus"] = False
+
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-fig.suptitle('X-SIR跨语言语义一致性测试', fontsize=16, fontweight='bold')
+fig.suptitle('X-SIR Cross-Lingual Semantic Consistency Test', fontsize=16, fontweight='bold')
 
 # 1. Z-score变化对比
 ax1 = axes[0, 0]
 x = np.arange(len(test_prompts))
 width = 0.35
 
-ax1.bar(x - width/2, results['kgw']['original_z'], width, label='KGW原文', color='#3498db', alpha=0.8)
-ax1.bar(x + width/2, results['kgw']['paraphrased_z'], width, label='KGW改写', color='#e74c3c', alpha=0.8)
-ax1.axhline(y=4.0, color='green', linestyle='--', alpha=0.5, label='检测阈值')
-ax1.set_xlabel('样本索引', fontsize=12)
+ax1.bar(x - width/2, results['kgw']['original_z'], width, label='KGW Original', color='#3498db', alpha=0.8)
+ax1.bar(x + width/2, results['kgw']['paraphrased_z'], width, label='KGW Paraphrased', color='#e74c3c', alpha=0.8)
+ax1.axhline(y=4.0, color='green', linestyle='--', alpha=0.5, label='Detection Threshold')
+ax1.set_xlabel('Sample Index', fontsize=12)
 ax1.set_ylabel('Z-score', fontsize=12)
-ax1.set_title('KGW水印：改写前后Z-score', fontsize=13, fontweight='bold')
+ax1.set_title('KGW: Z-score Before/After', fontsize=13, fontweight='bold')
 ax1.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax1.grid(axis='y', alpha=0.3)
 
 # 2. X-SIR Z-score对比
 ax2 = axes[0, 1]
-ax2.bar(x - width/2, results['xsir']['original_z'], width, label='X-SIR原文', color='#3498db', alpha=0.8)
-ax2.bar(x + width/2, results['xsir']['paraphrased_z'], width, label='X-SIR改写', color='#e74c3c', alpha=0.8)
-ax2.axhline(y=4.0, color='green', linestyle='--', alpha=0.5, label='检测阈值')
-ax2.set_xlabel('样本索引', fontsize=12)
+ax2.bar(x - width/2, results['xsir']['original_z'], width, label='X-SIR Original', color='#3498db', alpha=0.8)
+ax2.bar(x + width/2, results['xsir']['paraphrased_z'], width, label='X-SIR Paraphrased', color='#e74c3c', alpha=0.8)
+ax2.axhline(y=4.0, color='green', linestyle='--', alpha=0.5, label='Detection Threshold')
+ax2.set_xlabel('Sample Index', fontsize=12)
 ax2.set_ylabel('Z-score', fontsize=12)
-ax2.set_title('X-SIR水印：改写前后Z-score', fontsize=13, fontweight='bold')
+ax2.set_title('X-SIR: Z-score Before/After', fontsize=13, fontweight='bold')
 ax2.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax2.grid(axis='y', alpha=0.3)
 
 # 3. 一致性对比
@@ -206,8 +250,8 @@ consistencies = [avg_kgw_consistency, avg_xsir_consistency]
 colors = ['#e74c3c', '#27ae60']
 
 bars = ax3.bar(methods, consistencies, color=colors, alpha=0.8, width=0.6)
-ax3.set_ylabel('平均一致性', fontsize=12)
-ax3.set_title('改写后检测一致性对比', fontsize=13, fontweight='bold')
+ax3.set_ylabel('Average Consistency', fontsize=12)
+ax3.set_title('Detection Consistency After Paraphrase', fontsize=13, fontweight='bold')
 ax3.set_ylim(0, 1)
 ax3.grid(axis='y', alpha=0.3)
 
@@ -224,10 +268,15 @@ ax4.plot(x, results['xsir']['consistency'], marker='s', linewidth=2, markersize=
          label='X-SIR', color='#27ae60')
 ax4.axhline(y=avg_kgw_consistency, color='#e74c3c', linestyle='--', alpha=0.5)
 ax4.axhline(y=avg_xsir_consistency, color='#27ae60', linestyle='--', alpha=0.5)
-ax4.set_xlabel('样本索引', fontsize=12)
-ax4.set_ylabel('一致性', fontsize=12)
-ax4.set_title('逐样本一致性比较', fontsize=13, fontweight='bold')
+ax4.set_xlabel('Sample Index', fontsize=12)
+ax4.set_ylabel('Consistency', fontsize=12)
+ax4.set_title('Per-Sample Consistency Comparison', fontsize=13, fontweight='bold')
 ax4.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax4.grid(True, alpha=0.3)
 ax4.set_ylim(0, 1)
 
@@ -241,8 +290,10 @@ print("论文复现对比 (He et al., ACL 2024):")
 print("="*80)
 print(f"{'指标':<30} {'本实验':<20} {'论文报告':<20}")
 print("-"*80)
-print(f"{'KGW改写后一致性':<30} {avg_kgw_consistency:.1%:<20} {'<30%':<20}")
-print(f"{'X-SIR改写后一致性':<30} {avg_xsir_consistency:.1%:<20} {'70-80%':<20}")
+kgw_str = f"{avg_kgw_consistency:.1%}"
+xsir_str = f"{avg_xsir_consistency:.1%}"
+print(f"{'KGW改写后一致性':<30} {kgw_str:<20} {'<30%':<20}")
+print(f"{'X-SIR改写后一致性':<30} {xsir_str:<20} {'70-80%':<20}")
 print(f"{'相对提升':<30} {improvement:+.1f}%{'':<17} {'+40-50%':<20}")
 print("="*80)
 print("✅ Test 22 完成")

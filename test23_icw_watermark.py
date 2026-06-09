@@ -28,14 +28,40 @@ ICW局限:
 from test_common import *
 from run_experiment import ICWInitialsWatermark, ICWLexicalWatermark
 
+# 显存优化
+import gc
+gc.collect()
+torch.cuda.empty_cache()
+
+# 添加缺失的函数定义
+def detect_kgw_watermark(text, tokenizer, vocab_size, gamma=0.5, hash_key=15485863):
+    """KGW水印检测"""
+    return detect_watermark(text, "KGW", tokenizer, vocab_size, gamma=gamma, secret_key=hash_key)
+
+def calculate_perplexity(text, model, tokenizer):
+    """计算困惑度"""
+    if not text or not text.strip():
+        return float('inf')
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=512).to(model.device)
+    with torch.no_grad():
+        outputs = model(**inputs, labels=inputs["input_ids"])
+        loss = outputs.loss
+    return torch.exp(loss).item() if loss is not None else float('inf')
+
 print("=" * 80)
 print("Test 23: ICW上下文水印测试 (arXiv 2025)")
 print("=" * 80)
 
 # 加载模型
 print("\n正在加载模型...")
-model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
-tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+# 复用已加载的模型
+if target_model is None:
+    model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
+    tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+else:
+    model = target_model
+    tokenizer = detector_tokenizer
+    print(f"使用已加载的模型: {TARGET_MODEL}")
 print("✅ 模型加载完成")
 
 # 测试提示词
@@ -133,8 +159,12 @@ print(f"\nICW Lexical水印:")
 print(f"  平均词汇频率: {avg_freq_icw_lexical:.3f}")
 
 # 可视化
+# 设置字体避免乱码
+plt.rcParams["font.family"] = "DejaVu Sans"
+plt.rcParams["axes.unicode_minus"] = False
+
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-fig.suptitle('ICW上下文水印测试结果', fontsize=16, fontweight='bold')
+fig.suptitle('ICW Context Watermark Test Results', fontsize=16, fontweight='bold')
 
 # 1. Z-score对比（Initials）
 ax1 = axes[0, 0]
@@ -142,25 +172,30 @@ x = np.arange(len(test_prompts))
 width = 0.35
 
 ax1.bar(x - width/2, results['no_watermark']['z_scores'], width,
-        label='无水印', color='#95a5a6', alpha=0.8)
+        label='No Watermark', color='#95a5a6', alpha=0.8)
 ax1.bar(x + width/2, results['icw_initials']['z_scores'], width,
         label='ICW Initials', color='#3498db', alpha=0.8)
-ax1.axhline(y=2.0, color='red', linestyle='--', alpha=0.5, label='检测阈值')
-ax1.set_xlabel('样本索引', fontsize=12)
+ax1.axhline(y=2.0, color='red', linestyle='--', alpha=0.5, label='Detection Threshold')
+ax1.set_xlabel('Sample Index', fontsize=12)
 ax1.set_ylabel('Z-score', fontsize=12)
-ax1.set_title('ICW Initials检测效果', fontsize=13, fontweight='bold')
+ax1.set_title('ICW Initials Detection Performance', fontsize=13, fontweight='bold')
 ax1.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax1.grid(axis='y', alpha=0.3)
 
 # 2. 平均对比
 ax2 = axes[0, 1]
-methods = ['无水印', 'ICW Initials']
+methods = ['No Watermark', 'ICW Initials']
 avg_scores = [avg_z_no_wm, avg_z_icw_initials]
 colors = ['#95a5a6', '#3498db']
 
 bars = ax2.bar(methods, avg_scores, color=colors, alpha=0.8, width=0.6)
-ax2.set_ylabel('平均Z-score', fontsize=12)
-ax2.set_title('平均检测分数对比', fontsize=13, fontweight='bold')
+ax2.set_ylabel('Average Z-score', fontsize=12)
+ax2.set_title('Average Detection Score Comparison', fontsize=13, fontweight='bold')
 ax2.grid(axis='y', alpha=0.3)
 
 for bar, val in zip(bars, avg_scores):
@@ -170,11 +205,16 @@ for bar, val in zip(bars, avg_scores):
 # 3. Lexical词汇频率
 ax3 = axes[1, 0]
 ax3.bar(x, results['icw_lexical']['frequencies'], color='#2ecc71', alpha=0.8)
-ax3.axhline(y=0.02, color='red', linestyle='--', alpha=0.5, label='基线频率')
-ax3.set_xlabel('样本索引', fontsize=12)
-ax3.set_ylabel('特定词汇频率', fontsize=12)
-ax3.set_title('ICW Lexical词汇使用频率', fontsize=13, fontweight='bold')
+ax3.axhline(y=0.02, color='red', linestyle='--', alpha=0.5, label='Baseline Frequency')
+ax3.set_xlabel('Sample Index', fontsize=12)
+ax3.set_ylabel('Target Word Frequency', fontsize=12)
+ax3.set_title('ICW Lexical Word Usage Frequency', fontsize=13, fontweight='bold')
 ax3.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax3.grid(axis='y', alpha=0.3)
 
 # 4. 检测率分布
@@ -189,8 +229,8 @@ detection_rates = [
 ]
 
 ax4.bar(methods, detection_rates, color=colors, alpha=0.8, width=0.6)
-ax4.set_ylabel('检测率', fontsize=12)
-ax4.set_title('水印检测率 (阈值=2.0)', fontsize=13, fontweight='bold')
+ax4.set_ylabel('Detection Rate', fontsize=12)
+ax4.set_title('Watermark Detection Rate (Threshold=2.0)', fontsize=13, fontweight='bold')
 ax4.set_ylim(0, 1)
 ax4.grid(axis='y', alpha=0.3)
 

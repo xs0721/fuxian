@@ -48,11 +48,16 @@ ax3_3 = fig3.add_subplot(gs3[1, 0])
 ax3_4 = fig3.add_subplot(gs3[1, 1])
 
 sns.boxplot(x="Algorithm", y="Z_Score", hue="State", data=df_scrub, ax=ax3_1, width=0.6, showfliers=False)
-sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=df_scrub, ax=ax3_1, dodge=True, color='black', alpha=0.3)
+sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=df_scrub, ax=ax3_1, dodge=True, color='black', alpha=0.3, legend=False)
 ax3_1.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold')
 ax3_1.set_title('Test 3A: WS Attack - Scrubbing (Targeted Removal)', fontsize=14, fontweight='bold')
 ax3_1.set_ylabel('Z-Score', fontsize=13)
 ax3_1.legend(loc='lower left')
+# X 轴标签旋转
+ax3_1.tick_params(axis='x', rotation=45)
+for label in ax3_1.get_xticklabels():
+    label.set_rotation(45)
+    label.set_ha('right')
 
 t3_scrub_data = summary_table_3_scrub.reset_index()
 ax3_2.axis('off')
@@ -61,11 +66,16 @@ tab3 = ax3_2.table(cellText=t3_scrub_data.values, colLabels=t3_scrub_data.column
 tab3.auto_set_font_size(False); tab3.set_fontsize(11); tab3.scale(1, 2.5)
 
 sns.boxplot(x="Algorithm", y="Z_Score", hue="State", data=df_spoof, ax=ax3_3, width=0.6, showfliers=False)
-sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=df_spoof, ax=ax3_3, dodge=True, color='black', alpha=0.3)
+sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=df_spoof, ax=ax3_3, dodge=True, color='black', alpha=0.3, legend=False)
 ax3_3.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold')
 ax3_3.set_title('Test 3B: WS Attack - Spoofing (Framing Natural Text)', fontsize=14, fontweight='bold')
 ax3_3.set_ylabel('Z-Score', fontsize=13)
 ax3_3.legend(loc='upper left')
+# X 轴标签旋转
+ax3_3.tick_params(axis='x', rotation=45)
+for label in ax3_3.get_xticklabels():
+    label.set_rotation(45)
+    label.set_ha('right')
 
 t3_spoof_data = summary_table_3_spoof.reset_index()
 ax3_4.axis('off')

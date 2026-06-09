@@ -78,6 +78,10 @@ class _NonMmapFile:
     def keys(self):
         return self._tensor_meta.keys()
 
+    def offset_keys(self):
+        """返回所有tensor的键名列表（兼容safetensors新版本）"""
+        return list(self._tensor_meta.keys())
+
     def metadata(self):
         """返回元数据字典（兼容transformers新版本）"""
         return self._metadata.get('__metadata__', {})
@@ -152,7 +156,7 @@ warnings.filterwarnings("ignore")
 # transformers内部也引用safe_open, 需补丁
 import transformers.modeling_utils as _mu
 try:
-    import transformers.core_model_loading as _cml
+    import transformers.core_model_loading as _cml  # type: ignore
     _cml.safe_open = __import__('safetensors').safe_open
 except (ImportError, ModuleNotFoundError):
     # 旧版本transformers没有core_model_loading模块
@@ -175,7 +179,7 @@ FULL_KEY = [1, 0, 1, 0, 1, 0, 1, 0] * 20  # 160-bit
 
 # 低显存参数
 MAX_INP_LEN, MAX_ANS_LEN, N_REPEAT = 192, 64, 2
-MAX_SAMPLES = 1
+MAX_SAMPLES = 5  # 增加到 5 个样本以获得更可靠的统计结果
 BATCH_SIZE = 1
 
 # ── 模型加载 ──────────────────────────────────────
@@ -226,58 +230,70 @@ def load_multibit_models():
         print("加载 RewardModel (1.5B, GPU 4-bit)...")
         base_model = AutoModel.from_pretrained(
             RM_PATH, quantization_config=bnb,
-            device_map="cuda:0", low_cpu_mem_usage=True,
+            device_map="auto", low_cpu_mem_usage=True,
             trust_remote_code=True,
         )
     else:
         print("加载 RewardModel (1.5B, GPU fp16)...")
         base_model = AutoModel.from_pretrained(
             RM_PATH, torch_dtype=torch.float16,
-            device_map="cuda:0", low_cpu_mem_usage=True,
+            device_map="auto", low_cpu_mem_usage=True,
             trust_remote_code=True,
         )
     _reward_model = model_utils.RewardModel(base_model, _tokenizer)
     _reward_model.v_head.load_state_dict(
         torch.load(RM_HEADER_PATH, map_location='cpu', weights_only=True)
     )
-    _reward_model.v_head = _reward_model.v_head.to(
-        next(_reward_model.rwtransformer.parameters()).device
-    )
+    # 修复 dtype 不匹配：确保 v_head 与主模型使用相同的 dtype 和 device
+    target_device = next(_reward_model.rwtransformer.parameters()).device
+    target_dtype = next(_reward_model.rwtransformer.parameters()).dtype
+    _reward_model.v_head = _reward_model.v_head.to(device=target_device, dtype=target_dtype)
     _reward_model.eval()
     alloc_rm = torch.cuda.memory_allocated(0) / 1024**3
     print(f"  RewardModel GPU: {alloc_rm:.1f} GB")
 
-    # ── Model0: GPU 4-bit 或 fp16 ──
+    # ── Model0: GPU fp16（限制显存）──
     if USE_4BIT:
         print("加载 model0 (GPU 4-bit)...")
         _actor_model0 = AutoModelForCausalLM.from_pretrained(
             MODEL0_PATH, quantization_config=bnb,
-            device_map="cuda:0", low_cpu_mem_usage=True,
+            device_map="auto", low_cpu_mem_usage=True,
+            max_memory={0: "10GB", "cpu": "40GB"}
         ).eval()
     else:
-        print("加载 model0 (GPU fp16)...")
+        print("加载 model0 (GPU fp16，限制显存10GB)...")
         _actor_model0 = AutoModelForCausalLM.from_pretrained(
             MODEL0_PATH, torch_dtype=torch.float16,
-            device_map="cuda:0", low_cpu_mem_usage=True,
+            device_map="auto", low_cpu_mem_usage=True,
+            max_memory={0: "10GB", "cpu": "40GB"}
         ).eval()
     alloc_all = torch.cuda.memory_allocated(0) / 1024**3
     print(f"  model0 + RM GPU: {alloc_all:.1f} GB")
 
-    # ── Model1: CPU fp16 (最后加载,避免与其他模型争CPU RAM) ──
-    print("加载 model1 (CPU fp16)...")
+    # ── Model1: 强制 CPU float32（CPU 不支持 fp16）──
+    print("加载 model1 (强制 CPU float32)...")
     from transformers import PreTrainedModel
-    _orig_init_missing = PreTrainedModel._initialize_missing_keys
-    PreTrainedModel._initialize_missing_keys = (
-        lambda self, is_quantized: None
-    )
+
+    # 兼容不同版本的 transformers
+    _orig_init_missing = None
+    if hasattr(PreTrainedModel, '_initialize_missing_keys'):
+        _orig_init_missing = PreTrainedModel._initialize_missing_keys
+        PreTrainedModel._initialize_missing_keys = lambda self, is_quantized: None
+
     try:
         _actor_model1 = AutoModelForCausalLM.from_pretrained(
-            MODEL1_PATH, torch_dtype=torch.float16,
-            device_map="cpu", low_cpu_mem_usage=True,
+            MODEL1_PATH, torch_dtype=torch.float32,  # CPU 使用 float32
+            device_map={"": "cpu"},  # 强制所有层在 CPU
+            low_cpu_mem_usage=True,
         ).eval()
     finally:
-        PreTrainedModel._initialize_missing_keys = _orig_init_missing
-    print("  model1 加载完成")
+        if _orig_init_missing is not None:
+            PreTrainedModel._initialize_missing_keys = _orig_init_missing
+    print("  model1 加载完成 (CPU float32)")
+
+    # 清理 GPU 缓存
+    torch.cuda.empty_cache()
+    print(f"  清理后 GPU: {torch.cuda.memory_allocated(0) / 1024**3:.1f} GB")
 
     # ── 语义相似度模型 ──────────────────────────────
     print("加载 all-mpnet-base-v2...")
@@ -451,6 +467,44 @@ if __name__ == "__main__":
         print("[错误] 需要 CUDA GPU。")
         sys.exit(1)
 
+    # ── 检查 RewardModel 检查点文件 ──
+    if not os.path.exists(RM_HEADER_PATH):
+        print(f"[检测] RewardModel 检查点未找到: {RM_HEADER_PATH}")
+        ckpt_dir = os.path.dirname(RM_HEADER_PATH)
+
+        # 确保 ckpt 目录存在
+        if not os.path.exists(ckpt_dir):
+            os.makedirs(ckpt_dir, exist_ok=True)
+            print(f"  → 已创建目录: {ckpt_dir}")
+
+        # 尝试从 HuggingFace 下载
+        print("  → 尝试从 HuggingFace 下载...")
+        try:
+            from huggingface_hub import hf_hub_download
+            downloaded_path = hf_hub_download(
+                repo_id="xiaojunxu/WatermarkDecoder-Qwen2.5-1.5b",
+                filename="v_head.pt",
+                local_dir=ckpt_dir,
+                local_dir_use_symlinks=False
+            )
+            # 重命名为预期的文件名
+            import shutil
+            target_path = os.path.join(ckpt_dir, "WatermarkDecoder-v_head.pt")
+            if downloaded_path != target_path:
+                shutil.move(downloaded_path, target_path)
+            print(f"  ✅ 下载完成: {target_path}")
+        except Exception as e:
+            print(f"  ❌ 下载失败: {e}")
+            print(f"  请手动从 https://huggingface.co/xiaojunxu/WatermarkDecoder-Qwen2.5-1.5b 下载 v_head.pt")
+            print(f"  并保存到: {RM_HEADER_PATH}")
+            sys.exit(1)
+
+        # 再次检查
+        if not os.path.exists(RM_HEADER_PATH):
+            print(f"[错误] 检查点文件仍未找到: {RM_HEADER_PATH}")
+            sys.exit(1)
+
+    # ── 检查 fp16 模型 ──
     if not os.path.isdir(MODEL0_PATH):
         print(f"[检测] 本地fp16模型未找到: {MODEL0_PATH}")
         print("  → 自动运行模型准备脚本...\n")
@@ -532,13 +586,16 @@ if __name__ == "__main__":
             "Bit Accuracy (%)": bit_accuracy(actual_key, ext_wd30) * 100
         })
 
-        # T5 Rewrite
-        t5_text = llm_paraphrase_attack(wm_text)
-        ext_t5, _, _ = extract_multi_bit_watermark(t5_text, msg_len)
-        mb_results.append({
-            "Sample": idx, "State": "4_T5 Rewrite",
-            "Bit Accuracy (%)": bit_accuracy(actual_key, ext_t5) * 100
-        })
+        # T5 Rewrite（如果加载失败则跳过）
+        try:
+            t5_text = llm_paraphrase_attack(wm_text)
+            ext_t5, _, _ = extract_multi_bit_watermark(t5_text, msg_len)
+            mb_results.append({
+                "Sample": idx, "State": "4_T5 Rewrite",
+                "Bit Accuracy (%)": bit_accuracy(actual_key, ext_t5) * 100
+            })
+        except Exception as e:
+            print(f"  ⚠️  T5 攻击跳过（网络问题）: {type(e).__name__}")
 
     # ── 汇总 ──────────────────────────────────────
     df_mb = pd.DataFrame(mb_results)

@@ -23,16 +23,32 @@ GitHub: https://github.com/nilslukas/ada-wm-evasion
 
 from test_common import *
 
+# 显存优化：清理显存并复用模型
+import gc
+gc.collect()
+torch.cuda.empty_cache()
+
+# 添加缺失的函数定义
+def detect_kgw_watermark(text, tokenizer, vocab_size, gamma=0.5, hash_key=15485863):
+    """KGW水印检测"""
+    return detect_watermark(text, "KGW", tokenizer, vocab_size, gamma=gamma, secret_key=hash_key)
+
 print("=" * 80)
 print("Test 20: 自适应边界逃逸攻击 (ICML 2025)")
 print("=" * 80)
 
-target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
-target_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+# 复用test_common已加载的模型
+if target_model is None:
+    target_model = AutoModelForCausalLM.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR).to(device)
+    target_tokenizer = AutoTokenizer.from_pretrained(TARGET_MODEL, cache_dir=CACHE_DIR)
+else:
+    target_tokenizer = detector_tokenizer
+    print(f"使用已加载的模型: {TARGET_MODEL}")
 
 # 加载带水印文本
 df = pd.read_csv(CSV_FILENAME)
-kgw_samples = df[df['algorithm'] == 'KGW'].head(50)
+# 修复：使用正确的列名
+kgw_samples = df.dropna(subset=['Text_KGW']).head(50)
 
 print(f"加载了 {len(kgw_samples)} 个KGW水印样本")
 
@@ -45,7 +61,7 @@ LEARNING_RATE = 0.1  # "学习率"（扰动步长）
 results = []
 
 for idx, row in tqdm(kgw_samples.iterrows(), total=len(kgw_samples), desc="自适应逃逸"):
-    original_text = row['text']
+    original_text = row['Text_KGW']  # 修复：使用正确的列名
     tokens = target_tokenizer.encode(original_text, add_special_tokens=False)
 
     if len(tokens) < 10:
@@ -135,30 +151,40 @@ avg_z_reduction = results_df['z_reduction'].mean()
 avg_semantic = results_df['semantic_sim'].mean()
 
 print(f"\n{'='*60}")
-print("自适应边界逃逸攻击结果:")
+print("Adaptive Boundary Evasion Attack Results:")
 print(f"{'='*60}")
-print(f"  逃逸成功率: {success_rate:.2%}")
-print(f"  平均迭代次数: {avg_iterations:.1f}")
-print(f"  平均Z-score下降: {avg_z_reduction:.2f}")
-print(f"  平均语义保持度: {avg_semantic:.3f}")
+print(f"  Evasion Success Rate: {success_rate:.2%}")
+print(f"  Average Iterations: {avg_iterations:.1f}")
+print(f"  Average Z-score Reduction: {avg_z_reduction:.2f}")
+print(f"  Average Semantic Similarity: {avg_semantic:.3f}")
+print(f"  Average Semantic Similarity: {avg_semantic:.3f}")
 
-# 可视化
+# Set font to avoid Chinese character issues
+plt.rcParams['font.family'] = 'DejaVu Sans'
+plt.rcParams['axes.unicode_minus'] = False
+
+# Visualization
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-fig.suptitle('自适应边界逃逸攻击效果', fontsize=16, fontweight='bold')
+fig.suptitle('Adaptive Boundary Evasion Attack Results', fontsize=16, fontweight='bold')
 
-# 1. Z-score变化
+# 1. Z-score Change
 ax1 = axes[0, 0]
 ax1.scatter(results_df['z_init'], results_df['z_final'], alpha=0.6, s=50, color='#e74c3c')
-ax1.plot([0, 10], [0, 10], 'k--', alpha=0.3, label='无变化线')
-ax1.axhline(y=DETECTION_THRESHOLD, color='red', linestyle='--', label=f'检测阈值={DETECTION_THRESHOLD}')
+ax1.plot([0, 10], [0, 10], 'k--', alpha=0.3, label='No Change')
+ax1.axhline(y=DETECTION_THRESHOLD, color='red', linestyle='--', label=f'Threshold={DETECTION_THRESHOLD}')
 ax1.axvline(x=DETECTION_THRESHOLD, color='red', linestyle='--')
-ax1.set_xlabel('初始 Z-score', fontsize=12)
-ax1.set_ylabel('逃逸后 Z-score', fontsize=12)
-ax1.set_title('Z-score变化', fontsize=13, fontweight='bold')
+ax1.set_xlabel('Initial Z-score', fontsize=12)
+ax1.set_ylabel('Final Z-score', fontsize=12)
+ax1.set_title('Z-score Change', fontsize=13, fontweight='bold')
 ax1.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax1.grid(True, alpha=0.3)
 
-# 2. 逃逸成功率 vs 语义损失
+# 2. Evasion Success Rate vs Semantic Loss
 ax2 = axes[0, 1]
 semantic_bins = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 bin_success = []
@@ -172,33 +198,43 @@ for i in range(len(semantic_bins) - 1):
 ax2.bar(range(len(bin_success)), bin_success, color='#3498db', alpha=0.8)
 ax2.set_xticks(range(len(bin_success)))
 ax2.set_xticklabels([f'{semantic_bins[i]:.1f}-{semantic_bins[i+1]:.1f}' for i in range(len(bin_success))], rotation=45)
-ax2.set_xlabel('语义保持度区间', fontsize=12)
-ax2.set_ylabel('逃逸成功率', fontsize=12)
-ax2.set_title('语义-逃逸权衡', fontsize=13, fontweight='bold')
+ax2.set_xlabel('Semantic Similarity Range', fontsize=12)
+ax2.set_ylabel('Evasion Success Rate', fontsize=12)
+ax2.set_title('Semantic-Evasion Tradeoff', fontsize=13, fontweight='bold')
 ax2.grid(axis='y', alpha=0.3)
 ax2.set_ylim(0, 1)
 
-# 3. 迭代次数分布
+# 3. Iteration Count Distribution
 ax3 = axes[1, 0]
 ax3.hist(results_df['iterations'], bins=15, color='#9b59b6', alpha=0.7, edgecolor='black')
-ax3.axvline(x=avg_iterations, color='red', linestyle='--', linewidth=2, label=f'平均={avg_iterations:.1f}')
-ax3.set_xlabel('迭代次数', fontsize=12)
-ax3.set_ylabel('样本数', fontsize=12)
-ax3.set_title('收敛速度分布', fontsize=13, fontweight='bold')
+ax3.axvline(x=avg_iterations, color='red', linestyle='--', linewidth=2, label=f'Mean={avg_iterations:.1f}')
+ax3.set_xlabel('Iterations', fontsize=12)
+ax3.set_ylabel('Sample Count', fontsize=12)
+ax3.set_title('Convergence Speed Distribution', fontsize=13, fontweight='bold')
 ax3.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax3.grid(axis='y', alpha=0.3)
 
-# 4. 帕累托前沿
+# 4. Pareto Frontier
 ax4 = axes[1, 1]
 scatter = ax4.scatter(1 - results_df['semantic_sim'], results_df['z_final'],
                       c=results_df['evasion_success'], cmap='RdYlGn', s=60, alpha=0.7)
-ax4.axhline(y=DETECTION_THRESHOLD, color='red', linestyle='--', label='检测阈值')
-ax4.set_xlabel('语义损失 (1 - 相似度)', fontsize=12)
-ax4.set_ylabel('逃逸后 Z-score', fontsize=12)
-ax4.set_title('帕累托前沿（颜色=成功/失败）', fontsize=13, fontweight='bold')
+ax4.axhline(y=DETECTION_THRESHOLD, color='red', linestyle='--', label='Detection Threshold')
+ax4.set_xlabel('Semantic Loss (1 - Similarity)', fontsize=12)
+ax4.set_ylabel('Final Z-score', fontsize=12)
+ax4.set_title('Pareto Frontier (color=success)', fontsize=13, fontweight='bold')
 ax4.legend()
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax4.grid(True, alpha=0.3)
-plt.colorbar(scatter, ax=ax4, label='逃逸成功')
+plt.colorbar(scatter, ax=ax4, label='Evasion Success')
 
 plt.tight_layout()
 plt.savefig('attack_20_adaptive_evasion.png', dpi=300, bbox_inches='tight')
@@ -210,9 +246,12 @@ print("论文复现对比 (Diaa et al., ICML 2025):")
 print("="*80)
 print(f"{'指标':<30} {'本实验':<20} {'论文报告':<20}")
 print("-"*80)
-print(f"{'逃逸成功率':<30} {success_rate:.1%:<20} {'75-85%':<20}")
-print(f"{'平均迭代次数':<30} {avg_iterations:.1f:<20} {'15-20':<20}")
-print(f"{'语义保持度':<30} {avg_semantic:.3f:<20} {'0.85+':<20}")
+success_str = f"{success_rate:.1%}"
+iter_str = f"{avg_iterations:.1f}"
+semantic_str = f"{avg_semantic:.3f}"
+print(f"{'逃逸成功率':<30} {success_str:<20} {'75-85%':<20}")
+print(f"{'平均迭代次数':<30} {iter_str:<20} {'15-20':<20}")
+print(f"{'语义保持度':<30} {semantic_str:<20} {'0.85+':<20}")
 print(f"{'跨水印可迁移性':<30} {'未测试':<20} {'60%+':<20}")
 print("="*80)
 print("✅ Test 20 完成")

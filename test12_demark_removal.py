@@ -176,6 +176,11 @@ ax1.set_title('Test 12: De-mark Token-Level Watermark Removal\n'
 ax1.set_ylabel('Z-Score', fontsize=12)
 ax1.set_xlabel('')
 ax1.legend(loc='upper right')
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax1.tick_params(axis='x', rotation=15)
 
 table_data = summary_demark.reset_index()

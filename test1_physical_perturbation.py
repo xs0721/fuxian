@@ -83,9 +83,12 @@ for ax_line, ax_table, label, results, summary in axes:
     ax_line.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Threshold (z=4.0)')
     ax_line.set_title(f'Test 1{label}', fontsize=13, fontweight='bold')
     ax_line.set_ylabel('Average Z-Score', fontsize=12)
+    ax_line.set_xlabel('Attack Ratio (%)', fontsize=12)
     all_s = [s for scores in results.values() for s in scores]
     ax_line.set_ylim(min(min(all_s) - 0.5, -0.5), max(max(all_s) + 0.5, 4.5))
     ax_line.legend(loc='lower left', fontsize=9)
+    # X 轴标签旋转
+    ax_line.tick_params(axis='x', rotation=0)  # 折线图的 X 轴是数字，不需要旋转
 
     t_data = summary.reset_index()
     t_data.rename(columns={'index': 'Algo(Z)'}, inplace=True)

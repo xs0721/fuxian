@@ -81,17 +81,34 @@ def DM_generate_with_key(model0, model1, tokenizer, key, input_ids, attention_ma
         input_ids_m1, attention_mask_m1 = input_ids.to(model1.device), attention_mask.to(model1.device)
         outputs0 = model0(input_ids=input_ids_m0, attention_mask=attention_mask_m0, past_key_values=None, use_cache=use_cache, return_dict=True)
         outputs1 = model1(input_ids=input_ids_m1, attention_mask=attention_mask_m1, past_key_values=None, use_cache=use_cache, return_dict=True)
+
+        # 数值稳定性：提前 clamp 两个模型的 logits
         next_tokens_scores0 = outputs0.logits[:,-1,:]
+        next_tokens_scores0 = torch.clamp(next_tokens_scores0, min=-1e4, max=1e4)
+        next_tokens_scores0 = torch.nan_to_num(next_tokens_scores0, nan=0.0, posinf=1e4, neginf=-1e4)
+
         next_tokens_scores1 = outputs1.logits[:,-1,:].to(model0.device)
+        next_tokens_scores1 = torch.clamp(next_tokens_scores1, min=-1e4, max=1e4)
+        next_tokens_scores1 = torch.nan_to_num(next_tokens_scores1, nan=0.0, posinf=1e4, neginf=-1e4)
+
         cur_key = torch.FloatTensor([key[cur_id] for cur_id in key_idx]).to(next_tokens_scores0).unsqueeze(1)
         next_tokens_scores = (1-cur_key)*next_tokens_scores0 + cur_key*next_tokens_scores1  # key=0 -> use model0, key=1 -> use model1
 
         if do_sample:
             # Step 1: top-50 logit warper
             indices_to_remove = (next_tokens_scores<torch.topk(next_tokens_scores, 50)[0][..., -1, None])
-            next_tokens_scores = next_tokens_scores.masked_fill(indices_to_remove, -1000)
+            next_tokens_scores = next_tokens_scores.masked_fill(indices_to_remove, -65000.0)
+
+            # 数值稳定性：clamp logits 防止 inf/nan
+            next_tokens_scores = torch.clamp(next_tokens_scores, min=-1e4, max=1e4)
+
             # Step 2: run sample
             probs = torch.nn.functional.softmax(next_tokens_scores, dim=-1)
+
+            # 额外保护：确保 probs 有效
+            probs = torch.nan_to_num(probs, nan=0.0, posinf=0.0, neginf=0.0)
+            probs = probs / (probs.sum(dim=-1, keepdim=True) + 1e-10)  # 重新归一化
+
             next_tokens = torch.multinomial(probs, num_samples=1).squeeze(1)
         else:
             # run greedy search
@@ -142,7 +159,7 @@ def DM_generate_with_key(model0, model1, tokenizer, key, input_ids, attention_ma
                         if do_sample:
                             # Step 1: top-50 logit warper
                             indices_to_remove = (one_next_tokens_scores<torch.topk(one_next_tokens_scores, 50)[0][..., -1, None])
-                            one_next_tokens_scores = one_next_tokens_scores.masked_fill(indices_to_remove, -1000)
+                            one_next_tokens_scores = one_next_tokens_scores.masked_fill(indices_to_remove, -65000.0)
                             # Step 2: run sample
                             probs = torch.nn.functional.softmax(one_next_tokens_scores, dim=-1)
                             one_next_token = torch.multinomial(probs, num_samples=1).squeeze(0)

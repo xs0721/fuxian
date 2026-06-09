@@ -155,6 +155,11 @@ ax_ppl.set_title('Perplexity (PPL ↓)\nLower = Better Fluency', fontsize=13, fo
 ax_ppl.set_ylabel('Perplexity', fontsize=12)
 ax_ppl.set_xlabel('')
 ax_ppl.legend(loc='upper left', fontsize=8)
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax_ppl.tick_params(axis='x', rotation=20)
 
 # 图 B: 语义相似度柱状图
@@ -169,6 +174,11 @@ ax_sem.set_ylabel('Semantic Similarity vs Natural (%)', fontsize=12)
 ax_sem.set_xlabel('')
 ax_sem.set_ylim(0, 105)
 ax_sem.legend(loc='lower right', fontsize=8)
+    # X 轴标签旋转
+    ax.tick_params(axis="x", rotation=45)
+    for label in ax.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha("right")
 ax_sem.tick_params(axis='x', rotation=20)
 
 # 图 C: 数据汇总表

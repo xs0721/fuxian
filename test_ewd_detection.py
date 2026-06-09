@@ -23,11 +23,6 @@ GitHub: https://github.com/luyijian3/EWD
 import sys
 import os
 
-# ============================================================================
-# 自动设置环境变量 - 无需手动export
-# ============================================================================
-os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'
-
 # 强制UTF-8编码
 if sys.stdout.encoding != 'utf-8':
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')

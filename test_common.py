@@ -3,17 +3,17 @@ import sys
 import os
 import hashlib
 
+# 强制 UTF-8 编码, 解决 Windows 终端 GBK 显示乱码问题（必须在第一时间设置）
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # ============================================================================
 # 自动设置环境变量 - 无需手动export
 # ============================================================================
 os.environ['HF_ENDPOINT'] = 'https://hf-mirror.com'  # HuggingFace镜像加速
 print(f"✅ 已自动设置 HF_ENDPOINT={os.environ['HF_ENDPOINT']}")
-
-# 强制 UTF-8 编码, 解决 Windows 终端 GBK 显示乱码问题
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-if sys.stderr.encoding != 'utf-8':
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 import pandas as pd
 import random
@@ -25,7 +25,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM, MarianTokenizer, MarianMTModel, AutoModelForCausalLM, LogitsProcessor, LogitsProcessorList, GenerationConfig
-from transformers.cache_utils import DynamicCache
+
+# 兼容旧版transformers：DynamicCache在4.36+才有，4.35用旧API
+try:
+    from transformers.cache_utils import DynamicCache
+except ImportError:
+    # transformers < 4.36，使用旧的cache API
+    DynamicCache = None
 from copy import deepcopy
 import warnings
 import re
@@ -36,11 +42,71 @@ warnings.filterwarnings("ignore")
 current_dir = os.path.dirname(os.path.abspath(__file__))
 os.chdir(current_dir)
 
-CACHE_DIR = "E:/Your_Cloud_Drive/hf_cache"
-TARGET_MODEL = "facebook/opt-125m"
-ATTACKER_MODEL = "t5-small"
+# 自动检测CACHE_DIR：Linux服务器 vs Windows本地
+import platform
+if platform.system() == "Windows":
+    CACHE_DIR = "E:/Your_Cloud_Drive/hf_cache"
+else:
+    CACHE_DIR = "/root/autodl-tmp/hf_cache"
+
+# ============================================================================
+# 智能模型路径 - 优先使用本地缓存，避免网络下载
+# ============================================================================
+def _get_local_model_path(model_name, cache_dir):
+    """检查模型是否在本地缓存，返回本地路径或HF仓库名"""
+    # HuggingFace缓存目录格式：models--{org}--{name}
+    cache_name = model_name.replace("/", "--")
+    cache_path = os.path.join(cache_dir, f"models--{cache_name}")
+
+    if os.path.exists(cache_path):
+        # 查找 snapshots 目录下的最新快照
+        snapshots_dir = os.path.join(cache_path, "snapshots")
+        if os.path.exists(snapshots_dir):
+            snapshots = os.listdir(snapshots_dir)
+            if snapshots:
+                latest = sorted(snapshots)[-1]  # 取最新的
+                local_path = os.path.join(snapshots_dir, latest)
+                print(f"✅ 使用本地模型: {model_name} -> {local_path}")
+                return local_path
+
+    print(f"⚠️  本地未找到 {model_name}，将尝试在线下载")
+    return model_name  # 回退到在线下载
+
+# 智能模型选择 - 根据可用资源自动选择最佳模型
+try:
+    from model_selector import get_model_for_test
+    TARGET_MODEL = get_model_for_test("test_common初始化", cache_dir=CACHE_DIR)
+except ImportError:
+    print("⚠️  未找到model_selector.py，使用默认模型")
+    TARGET_MODEL = "facebook/opt-125m"
+
+# 转换为本地路径（如果存在）
+TARGET_MODEL = _get_local_model_path(TARGET_MODEL, CACHE_DIR)
+ATTACKER_MODEL = _get_local_model_path("t5-small", CACHE_DIR)
+
 CSV_FILENAME = "watermark_benchmark_results.csv"
-GEMMA_DIR = "google/gemma-2-2b-it"  # 使用HuggingFace仓库名，自动下载
+
+# Gemma模型路径：优先使用本地路径（如果存在），否则回退到在线下载
+import os as _os
+# 尝试多个可能的路径（包括符号链接和实际路径）
+_gemma_candidates = [
+    "/root/autodl-tmp/hf_cache/models--google--gemma-2-2b-it/snapshots/gemma-2-2b-it",  # 新上传的位置
+    "/root/autodl-tmp/hf_cache/._____temp/LLM-Research/gemma-2-2b-it",
+    "/root/autodl-tmp/gemma-2-2b-it",
+    "/root/autodl-tmp/LLM-Research/gemma-2-2b-it",
+    _os.path.expanduser("~/autodl-tmp/gemma-2-2b-it"),
+]
+_local_gemma = None
+for candidate in _gemma_candidates:
+    if _os.path.exists(candidate) and _os.path.exists(_os.path.join(candidate, "config.json")):
+        _local_gemma = candidate
+        break
+
+if _local_gemma:
+    GEMMA_DIR = _local_gemma
+    print(f"✅ 检测到本地 Gemma 模型: {GEMMA_DIR}")
+else:
+    GEMMA_DIR = _get_local_model_path("google/gemma-2-2b-it", CACHE_DIR)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 vocab_size = 50272
@@ -159,16 +225,25 @@ def load_attacker():
     global attacker_tokenizer, attacker_model
     if not _models_loaded["attacker"]:
         print(f"[{device.upper()}] 加载重写模型: {ATTACKER_MODEL}...")
-        attacker_tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR)
-        attacker_model = AutoModelForSeq2SeqLM.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR).to(device)
-        _models_loaded["attacker"] = True
+        try:
+            attacker_tokenizer = AutoTokenizer.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR)
+            attacker_model = AutoModelForSeq2SeqLM.from_pretrained(ATTACKER_MODEL, cache_dir=CACHE_DIR).to(device)
+            _models_loaded["attacker"] = True
+            print(f"✅ 重写模型加载")
+        except Exception as e:
+            print(f"❌ 重写模型加载！")
+            print(f"   错误: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
 
 def load_translation_models():
     global en_fr_tokenizer, en_fr_model, fr_en_tokenizer, fr_en_model
     if not _models_loaded["translation"]:
         print(f"[{device.upper()}] 加载 CWRA 回译引擎 (En<->Fr)...")
-        en_fr_mn = "Helsinki-NLP/opus-mt-en-fr"
-        fr_en_mn = "Helsinki-NLP/opus-mt-fr-en"
+        # 使用本地路径（如果存在）
+        en_fr_mn = _get_local_model_path("Helsinki-NLP/opus-mt-en-fr", CACHE_DIR)
+        fr_en_mn = _get_local_model_path("Helsinki-NLP/opus-mt-fr-en", CACHE_DIR)
         en_fr_tokenizer = MarianTokenizer.from_pretrained(en_fr_mn, cache_dir=CACHE_DIR)
         en_fr_model = MarianMTModel.from_pretrained(en_fr_mn, cache_dir=CACHE_DIR).to(device)
         fr_en_tokenizer = MarianTokenizer.from_pretrained(fr_en_mn, cache_dir=CACHE_DIR)
@@ -362,7 +437,7 @@ def synonym_substitution_attack(text, ratio=0.3):
 
 # ---- 复制粘贴攻击 (来自 ASW markllm_editor.CopyPasteAttack) ----
 def copy_paste_attack(text, reference_text=None, ratio=0.2):
-    """从无 watermark 的参考文本中随机复制句子替换 watermark 文本中的句子.
+    """从无 watermark 的参考文本随机复制句子替换 watermark 文本中的句子.
     (来自 ASW markllm_editor.CopyPasteAttack)"""
     if not isinstance(text, str) or not text.strip():
         return text
@@ -496,7 +571,7 @@ def sira_masking(text, model, tokenizer, threshold_percentile=30, device="cuda")
             while i < len(tokens) and mask_flags[i]:
                 i += 1
         else:
-            # 低自信息块: 保留作为上下文 (保留原始 token, 不 strip Ġ/Ċ)
+            # 低自信息块: 保留作为上下文 (保留 token, 不 strip Ġ/Ċ)
             masked_tokens.append(tokens[i])
             i += 1
 
@@ -520,7 +595,7 @@ def sira_attack_prompt(reference_text, blank_text):
 
 def sira_t5_infilling(masked_text, reference_text=None):
     """Stage 3: T5 文本填充.
-    如果有 reference_text, 将其作为上下文拼接到输入中辅助 T5 填充空白位;
+    如果有 reference_text, 将其作为上下文拼接到输入辅助 T5 填充空白位;
     否则回退到直接填充空白位."""
     load_attacker()
     if "<extra_id_" not in masked_text:
@@ -539,7 +614,7 @@ def sira_t5_infilling(masked_text, reference_text=None):
                                           temperature=0.8, do_sample=True, early_stopping=True)
     filled_content = attacker_tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-    # 从 T5 输出中提取并替换 <extra_id_N> 占位符
+    # 从 T5 输出提取并替换 <extra_id_N> 占位符
     final_text = masked_text
     parts = [p.strip() for p in filled_content.split("<extra_id_") if p.strip()]
     for i, part in enumerate(parts):
@@ -562,7 +637,10 @@ def detect_sweet(text, model, tokenizer, vocab_size, gamma=0.5,
     """
     if not isinstance(text, str) or len(text.strip()) == 0:
         return -100.0
+    # 确保tokens在CPU上，稍后再移到device
     tokens = tokenizer.encode(text, return_tensors="pt")[0]
+    if tokens.device.type != 'cpu':
+        tokens = tokens.cpu()
     T = len(tokens) - 1
     if T <= 0:
         return -100.0
@@ -592,7 +670,7 @@ def detect_sweet(text, model, tokenizer, vocab_size, gamma=0.5,
         greenlist_size = int(vocab_size * gamma)
         vocab_permutation = torch.randperm(vocab_size, generator=g)
         greenlist = vocab_permutation[:greenlist_size]
-        if tokens[i] in greenlist:
+        if tokens[i].item() in greenlist.tolist():
             green_count += 1
 
     if scored_tokens < 1:
@@ -668,11 +746,9 @@ except FileNotFoundError:
     exit()
 
 algorithms = [col.replace("Text_", "") for col in df.columns if col.startswith("Text_")]
-print(f"目标算法: {algorithms}")
+print(f"算法: {algorithms}")
 
 sns.set_theme(style="whitegrid", palette="deep")
-plt.rcParams['font.sans-serif'] = ['SimHei', 'Microsoft YaHei', 'DejaVu Sans', 'Arial']
-plt.rcParams['axes.unicode_minus'] = False
 
 def print_table(df, title=""):
     """打印 DataFrame，自动处理 tabulate 缺失"""
@@ -709,8 +785,9 @@ class B4ContrastiveProcessor(LogitsProcessor):
             'attention_mask': inputs_empty['attention_mask'].repeat_interleave(n_beams, dim=0).to(self.origin_model.device)
         }
         self.first_input_ids = empty_ids.to(self.amateur_model.device)
-        self.cache_amateur = DynamicCache()
-        self.cache_origin = DynamicCache()
+        # 修复: 不手动初始化cache，让模型自动创建
+        self.cache_amateur = None
+        self.cache_origin = None
         self.prev_input_ids = None
         self.step_num = 0
 
@@ -728,20 +805,42 @@ class B4ContrastiveProcessor(LogitsProcessor):
         return torch.tensor(beam_idx)
 
     def __call__(self, input_ids, scores):
+        # transformers 4.36.2 + past_key_values:
+        # step 0: 完整 prompt
+        # step 1+: 只传最后一个 token，attention_mask 每步扩展一列
         if self.step_num == 0:
             input_ids = self.first_input_ids
-        elif self.step_num == 1:
-            input_ids = input_ids[:, -1:]
-            self.mk_amateur['attention_mask'] = self.mk_amateur['attention_mask'][:, -1:]
-            self.mk_origin['attention_mask'] = self.mk_origin['attention_mask'][:, -1:]
         else:
-            input_ids = input_ids[:, -self.step_num:]
+            input_ids = input_ids[:, -1:]
+            # 每步扩展 attention_mask（添加一列全1）
+            if self.step_num >= 1:
+                batch_size = self.mk_amateur['attention_mask'].shape[0]
+                new_mask = torch.ones((batch_size, 1),
+                                     dtype=self.mk_amateur['attention_mask'].dtype,
+                                     device=self.mk_amateur['attention_mask'].device)
+                self.mk_amateur['attention_mask'] = torch.cat([self.mk_amateur['attention_mask'], new_mask], dim=1)
+                self.mk_origin['attention_mask'] = torch.cat([self.mk_origin['attention_mask'], new_mask], dim=1)
 
         if self.prev_input_ids is not None:
             beam_idx = self._infer_beam_idx(input_ids, self.prev_input_ids)
             beam_idx = beam_idx.to(self.amateur_model.device)
-            self.cache_amateur = self.cache_amateur.reorder_cache(beam_idx)
-            self.cache_origin = self.cache_origin.reorder_cache(beam_idx)
+            # 处理 cache reorder：支持 tuple 和 DynamicCache 两种格式
+            if self.cache_amateur is not None:
+                if isinstance(self.cache_amateur, tuple):
+                    # 旧格式 tuple cache：手动 reorder 每一层
+                    reordered_amateur = []
+                    for layer_past in self.cache_amateur:
+                        reordered_amateur.append(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past))
+                    self.cache_amateur = tuple(reordered_amateur)
+
+                    reordered_origin = []
+                    for layer_past in self.cache_origin:
+                        reordered_origin.append(tuple(past_state.index_select(0, beam_idx) for past_state in layer_past))
+                    self.cache_origin = tuple(reordered_origin)
+                elif hasattr(self.cache_amateur, 'reorder_cache'):
+                    # DynamicCache 格式
+                    self.cache_amateur = self.cache_amateur.reorder_cache(beam_idx)
+                    self.cache_origin = self.cache_origin.reorder_cache(beam_idx)
 
         out_am = self.amateur_model(
             input_ids=input_ids.to(self.amateur_model.device),
@@ -826,10 +925,30 @@ def b4_proxy_erasure_attack(texts, paraphrase_model, amateur_model, origin_model
     all_attacked = []
     for i in range(0, len(texts), batch_size):
         batch_msgs = messages[i:i + batch_size]
-        inputs = tokenizer.apply_chat_template(
-            batch_msgs, return_tensors="pt", padding=True,
-            add_generation_prompt=True, return_dict=True
-        ).to(paraphrase_model.device)
+
+        # 检查 tokenizer 是否有 chat_template
+        if hasattr(tokenizer, 'chat_template') and tokenizer.chat_template is not None:
+            # 使用 chat_template（Gemma 等）
+            inputs = tokenizer.apply_chat_template(
+                batch_msgs, return_tensors="pt", padding=True,
+                add_generation_prompt=True, return_dict=True
+            ).to(paraphrase_model.device)
+        else:
+            # 手动构造 prompt（OPT 等）
+            batch_prompts = []
+            for msg_list in batch_msgs:
+                # 将消息列表转换为纯文本
+                prompt_text = ""
+                for msg in msg_list:
+                    if msg['role'] == 'system':
+                        prompt_text += msg['content'] + "\n\n"
+                    elif msg['role'] == 'user':
+                        prompt_text += "User: " + msg['content'] + "\n\nAssistant: "
+                batch_prompts.append(prompt_text)
+
+            inputs = tokenizer(batch_prompts, return_tensors="pt", padding=True,
+                             return_attention_mask=True).to(paraphrase_model.device)
+
         inputs_length = inputs.input_ids.shape[-1]
 
         logits_processor[0].prepare_before_generate(inputs)
@@ -852,5 +971,86 @@ def print_test_header(description):
     print(f"\n{'='*60}")
     print(f"[测试 {num}/{total}] {description}")
     print("="*60)
+
+# ================= 通用绘图函数 =================
+def plot_attack_results(df, test_name, test_number, output_filename, metric="Z-Score", threshold=4.0):
+    """
+    通用的攻击结果可视化函数
+
+    参数:
+        df: DataFrame，包含 'Algorithm', 'State', metric 列
+        test_name: str，测试名称（如 "B4 Proxy-guided Blind Erasure Attack"）
+        test_number: int，测试编号（如 7）
+        output_filename: str，输出文件名（如 "attack_7_b4_proxy_erasure.png"）
+        metric: str，指标名称（默认 "Z-Score"，也可以是 "TPR", "Perplexity" 等）
+        threshold: float，阈值线（仅对 Z-Score 有效，默认 4.0）
+    """
+    if df.empty:
+        print(f"⚠️  没有数据可绘制")
+        return
+
+    # 数据汇总表
+    summary_table = df.groupby(['Algorithm', 'State'])[metric].mean().unstack('State').round(3)
+    summary_table.columns = [col.split('_')[-1] if '_' in col else col for col in summary_table.columns]
+
+    print(f"\n=== [数据表] {test_name} {metric} 汇总 ===")
+    print(summary_table.to_string())
+
+    # 清理 State 列（去掉数字前缀）
+    df_plot = df.copy()
+    df_plot['State'] = df_plot['State'].apply(lambda x: x.split('_')[-1] if '_' in str(x) else x)
+
+    # 创建图表
+    fig = plt.figure(figsize=(14, 6))
+    gs = fig.add_gridspec(1, 2, width_ratios=[2, 1.2])
+    ax_chart = fig.add_subplot(gs[0])
+    ax_table = fig.add_subplot(gs[1])
+
+    # 左侧：箱线图 + 散点图
+    sns.boxplot(x="Algorithm", y=metric, hue="State", data=df_plot, ax=ax_chart, width=0.6, showfliers=False)
+    sns.stripplot(x="Algorithm", y=metric, hue="State", data=df_plot, ax=ax_chart, dodge=True, color='black', alpha=0.3, legend=False)
+
+    # 阈值线（仅对 Z-Score 有效）
+    if metric == "Z-Score" and threshold is not None:
+        ax_chart.axhline(y=threshold, color='#d9534f', linestyle='--', linewidth=2, label=f'Threshold (z={threshold})')
+
+    # 图表样式 - 标题放在下方
+    ax_chart.set_ylabel(metric, fontsize=13)
+    ax_chart.set_xlabel(f'Test {test_number}: {test_name}\n\nAlgorithm', fontsize=12)  # 标题作为 xlabel
+    ax_chart.legend(loc='upper right')
+
+    # X 轴标签旋转（解决重叠问题）
+    ax_chart.tick_params(axis='x', rotation=45)
+    for label in ax_chart.get_xticklabels():
+        label.set_rotation(45)
+        label.set_ha('right')
+
+    # 右侧：数据汇总表
+    ax_table.axis('off')
+
+    table_data = summary_table.reset_index()
+    table_data.rename(columns={'Algorithm': f'Algo\n({metric})'}, inplace=True)
+
+    table = ax_table.table(
+        cellText=table_data.values,
+        colLabels=table_data.columns,
+        loc='center',
+        cellLoc='center'
+    )
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 2.5)
+
+    # 表格标题放在下方
+    ax_table.text(0.5, -0.1, f'Data Summary (Metric: {metric})',
+                  ha='center', va='top', fontsize=13, fontweight='bold',
+                  transform=ax_table.transAxes)
+
+    # 保存
+    plt.tight_layout()
+    plt.savefig(output_filename, dpi=300, bbox_inches='tight')
+    print(f">>> 图表已保存: {output_filename}")
+    plt.show()
+    plt.close()
 
 print("\n>>> 公共模块加载完成 <<<")

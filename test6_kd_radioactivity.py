@@ -13,6 +13,11 @@ def simulate_kd_radioactivity(teacher_text, tokenizer, vocab_size, gamma=0.5, se
 
     student_tokens = [tokens[0]]
     for i in range(1, len(tokens)):
+        # 修复：跳过超出 vocab_size 的 token
+        if tokens[i] >= vocab_size:
+            student_tokens.append(tokens[i])
+            continue
+
         green_mask = get_kgw_green_mask(tokens[i-1], vocab_size, gamma, secret_key)
         is_green = green_mask[tokens[i]].item()
 
@@ -35,6 +40,9 @@ def simulate_wn_neutralization(teacher_text, tokenizer, vocab_size, gamma=0.5, s
     stolen_greenlist = {}
     for i in range(1, len(tokens)):
         prev = tokens[i-1]
+        # 修复：跳过超出 vocab_size 的 token
+        if prev >= vocab_size:
+            continue
         if prev not in stolen_greenlist:
             actual_green = get_kgw_green_mask(prev, vocab_size, gamma, secret_key)
             inferred = set()
@@ -50,6 +58,11 @@ def simulate_wn_neutralization(teacher_text, tokenizer, vocab_size, gamma=0.5, s
         prev_token = tokens[i-1]
         inferred_green = stolen_greenlist.get(prev_token, set())
         current = tokens[i]
+
+        # 修复：跳过超出 vocab_size 的 token
+        if current >= vocab_size or prev_token >= vocab_size:
+            neutralized_tokens.append(current)
+            continue
 
         if current in inferred_green:
             if random.random() < gamma:
@@ -90,40 +103,18 @@ for idx, row in tqdm(sample_kd_df.iterrows(), total=len(sample_kd_df), desc="知
         radioactivity_results.append({"Algorithm": algo, "State": "2_Student (Radioactive)", "Z_Score": z_radioactive})
         radioactivity_results.append({"Algorithm": algo, "State": "3_Student (WN Neutralized)", "Z_Score": z_wn})
 
+
 kd_df = pd.DataFrame(radioactivity_results)
-summary_table_kd = kd_df.groupby(['Algorithm', 'State'])['Z_Score'].mean().unstack('State').round(3)
-summary_table_kd.columns = [col.split('_', 1)[1] for col in summary_table_kd.columns]
 
-print("\n=== [数据表] KD 放射性与 WN 中和 Z-Score 汇总 ===")
-print(summary_table_kd.to_string())
+if not kd_df.empty:
+    # 使用通用绘图函数
+    plot_attack_results(
+        df=kd_df,
+        test_name="KD Radioactivity vs. Watermark Neutralization (WN)\n(Pan et al., ACL 2025)",
+        test_number=6,
+        output_filename="attack_6_kd_radioactivity_wn.png",
+        metric="Z_Score",
+        threshold=4.0
+    )
 
-kd_df['State'] = kd_df['State'].apply(lambda x: x.split('_', 1)[1])
-
-fig6 = plt.figure(figsize=(16, 6))
-gs6 = fig6.add_gridspec(1, 2, width_ratios=[2.5, 1])
-ax6_1 = fig6.add_subplot(gs6[0])
-ax6_2 = fig6.add_subplot(gs6[1])
-
-hue_order = ["Teacher Model", "Student (Radioactive)", "Student (WN Neutralized)"]
-sns.boxplot(x="Algorithm", y="Z_Score", hue="State", data=kd_df, ax=ax6_1, width=0.7, showfliers=False, hue_order=hue_order)
-sns.stripplot(x="Algorithm", y="Z_Score", hue="State", data=kd_df, ax=ax6_1, dodge=True, color='black', alpha=0.3, hue_order=hue_order)
-ax6_1.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2, label='Detection Threshold (z=4.0)')
-ax6_1.set_title('Task 1: KD Radioactivity vs. Watermark Neutralization (WN)\n(Pan et al., ACL 2025)', fontsize=14, pad=15, fontweight='bold')
-ax6_1.set_ylabel('Z-Score', fontsize=13)
-ax6_1.legend(loc='upper right')
-
-table6_data = summary_table_kd.reset_index()
-table6_data.rename(columns={'Algorithm': 'Algo\n(Z-Score)'}, inplace=True)
-ax6_2.axis('off')
-ax6_2.set_title('Data Summary (Metric: Z-Score)', fontsize=13, fontweight='bold', pad=10)
-table6 = ax6_2.table(cellText=table6_data.values, colLabels=table6_data.columns, loc='center', cellLoc='center')
-table6.auto_set_font_size(False)
-table6.set_fontsize(10)
-table6.scale(1, 2.5)
-
-plt.tight_layout()
-plt.savefig("attack_6_kd_radioactivity_wn.png", dpi=300, bbox_inches='tight')
-print(">>> 图表已保存: attack_6_kd_radioactivity_wn.png")
-plt.show()
-plt.close()
 print("=== 测试6完成 ===\n")
