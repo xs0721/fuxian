@@ -1,0 +1,40 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.conda/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Node.js
+node_modules/
+node-v*.tar.xz
+node-v*/
+
+# Logs
+*.log
+*.log.*
+run_output*.log
+run_direct.log
+final_run.log
+
+# Generated files
+*.png
+*.csv
+backup_*/
+
+# Misc
+*.code-workspace
+*.pdf

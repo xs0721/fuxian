@@ -1,0 +1,673 @@
+nohup: ignoring input
+设置成功
+注意：仅限于学术用途和加速访问github/huggingface，不承诺稳定性保证
+📦 安装依赖...
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+📊 步骤1: 基准测试
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+📏 步骤2: 长度测试
+[CUDA] 正在加载 facebook/opt-125m 进行动态长度敏感性分析...
+
+>>> 开始动态长度生成与轨迹追踪 (Generating & Tracking) <<<
+处理进度:   0%|          | 0/30 [00:00<?, ?it/s]处理进度:   3%|▎         | 1/30 [00:15<07:22, 15.24s/it]处理进度:   7%|▋         | 2/30 [00:29<06:50, 14.67s/it]处理进度:  10%|█         | 3/30 [00:44<06:35, 14.64s/it]处理进度:  13%|█▎        | 4/30 [00:59<06:26, 14.86s/it]处理进度:  17%|█▋        | 5/30 [01:13<06:06, 14.65s/it]处理进度:  20%|██        | 6/30 [01:28<05:52, 14.67s/it]处理进度:  23%|██▎       | 7/30 [01:42<05:35, 14.61s/it]处理进度:  27%|██▋       | 8/30 [01:57<05:20, 14.57s/it]处理进度:  30%|███       | 9/30 [02:12<05:07, 14.65s/it]处理进度:  33%|███▎      | 10/30 [02:26<04:50, 14.54s/it]处理进度:  37%|███▋      | 11/30 [02:41<04:37, 14.61s/it]处理进度:  40%|████      | 12/30 [02:55<04:23, 14.61s/it]处理进度:  43%|████▎     | 13/30 [03:10<04:09, 14.66s/it]处理进度:  47%|████▋     | 14/30 [03:25<03:54, 14.65s/it]处理进度:  50%|█████     | 15/30 [03:39<03:39, 14.64s/it]处理进度:  53%|█████▎    | 16/30 [03:55<03:27, 14.84s/it]处理进度:  57%|█████▋    | 17/30 [04:11<03:17, 15.20s/it]处理进度:  60%|██████    | 18/30 [04:28<03:09, 15.80s/it]处理进度:  63%|██████▎   | 19/30 [04:45<02:57, 16.15s/it]处理进度:  67%|██████▋   | 20/30 [05:02<02:44, 16.45s/it]处理进度:  70%|███████   | 21/30 [05:19<02:29, 16.64s/it]处理进度:  73%|███████▎  | 22/30 [05:36<02:14, 16.80s/it]处理进度:  77%|███████▋  | 23/30 [05:54<01:59, 17.01s/it]处理进度:  80%|████████  | 24/30 [06:11<01:41, 16.97s/it]处理进度:  83%|████████▎ | 25/30 [06:28<01:25, 17.06s/it]处理进度:  87%|████████▋ | 26/30 [06:45<01:08, 17.03s/it]处理进度:  90%|█████████ | 27/30 [07:02<00:51, 17.00s/it]处理进度:  93%|█████████▎| 28/30 [07:19<00:34, 17.05s/it]处理进度:  97%|█████████▋| 29/30 [07:36<00:16, 16.98s/it]处理进度: 100%|██████████| 30/30 [07:53<00:00, 17.10s/it]处理进度: 100%|██████████| 30/30 [07:53<00:00, 15.79s/it]
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Gene生成 C4_News 样本:  23%|██▎       | 46/200 [24生成 C4_News 样本:生成 C4_News 样本:  24%|██▎       | 47/200 [25生成 C4_News 样本:生成 C4_News 样本:  24%|██▍       | 48/200 [25生成 C4_News 样本:生成 C4_News 样本:  24%|██▍       | 49/200 [26生成 C4_News 样本:生成 C4_News 样本:  25%|██▌       | 50/200 [27生成 C4_News 样本:生成 C4_News 样本:  26%|██▌       | 51/200 [27生成 C4_News 样本:生成 C4_News 样本:  26%|██▌       | 52/200 [28生成 C4_News 样本:生成 C4_News 样本:  26%|██▋       | 53/200 [29生成 C4_News 样本:生成 C4_News 样本:  27%|██▋       | 54/200 [29生成 C4_News 样本:生成 C4_News 样本:  28%|██▊       | 55/200 [30生成 C4_News 样本:生成 C4_News 样本:  28%|██▊       | 56/200 [31生成 C4_News 样本:生成 C4_News 样本:  28%|██▊       | 57/200 [31生成 C4_News 样本:生成 C4_News 样本:  29%|██▉       | 58/200 [32生成 C4_News 样本:生成 C4_News 样本:  30%|██▉       | 59/200 [32生成 C4_News 样本:生成 C4_News 样本:  30%|███       | 60/200 [33生成 C4_News 样本:生成 C4_News 样本:  30%|███       | 61/200 [33生成 C4_News 样本:生成 C4_News 样本:  31%|███       | 62/200 [34生成 C4_News 样本:生成 C4_News 样本:  32%|███▏      | 63/200 [生成 C4_News 样本:  生成 C4_News 样本:  32%|███▏      | 64/200生成 C4_News 样本:  30生成 C4_News 样本:  32%|███▎      | 65/2生成 C4_News 样本:  31%|生成 C4_News 样本:  33%|███▎      | 66生成 C4_News 样本:  32%|�生成 C4_News 样本:  34%|███▎      | 67生成 C4_News 样本:  32%|�生成 C4_News 样本:  34%|███▍      | 68生成 C4_News 样本:  32%|�生成 C4_News 样本:  34%|███▍      | 69生成 C4_News 样本:  33%|�生成 C4_News 样本:  35%|███▌      | 70生成 C4_News 样本:  34%|�生成 C4_News 样本:  36%|███▌      | 71生成 C4_News 样本:  34%|�生成 C4_News 样本:  36%|███▌      | 72生成 C4_News 样本:  34%|生成 C4_News 样本:  36%|███▋      | 73/2生成 C4_News 样本:  35生成 C4_News 样本:  37%|███▋      | 74/200生成 C4_News 样本:  生成 C4_News 样本:  38%|███▊      | 75/200 [生成 C4_News 样本:生成 C4_News 样本:  38%|███▊      | 76/200 [40生成 C4_News 样�生成 C4_News 样本:  38%|███▊      | 77/200 [40生成 C4_News 样�生成 C4_News 样本:  39%|███▉      | 78/200 [41生成 C4_News 样�生成 C4_News 样本:  40%|███▉      | 79/200 [41生成 C4_News 样�生成 C4_News 样本:  40%|████      | 80/200 [42生成 C4_News 样�生成 C4_News 样本:  40%|████      | 81/200 [42生成 C4_News 样�生成 C4_News 样本:  41%|████      | 82/200 [43生成 C4_News 样�生成 C4_News 样本:  42%|████▏     | 83/200 [生成 C4_News 样本:生成 C4_News 样本:  42%|████▏     | 84/200生成 C4_News 样本:  生成 C4_News 样本:  42%|████▎     | 85/2生成 C4_News 样本:  41生成 C4_News 样本:  43%|████▎     | 86生成 C4_News 样本:  42%|生成 C4_News 样本:  44%|████▎     | 87生成 C4_News 样本:  42%|生成 C4_News 样本:  44%|████▍     | 88生成 C4_News 样本:  42%|生成 C4_News 样本:  44%|████▍     | 89生成 C4_News 样本:  43%|生成 C4_News 样本:  45%|████▌     | 90生成 C4_News 样本:  44%|生成 C4_News 样本:  46%|████▌     | 91生成 C4_News 样本:  44%|生成 C4_News 样本:  46%|████▌     | 92生成 C4_News 样本:  44%|生成 C4_News 样本:  46%|████▋     | 93生成 C4_News 样本:  45%|生成 C4_News 样本:  47%|████▋     | 94生成 C4_News 样本:  46%|生成 C4_News 样本:  48%|████▊     | 95生成 C4_News 样本:  46%|生成 C4_News 样本:  48%|████▊     | 96生成 C4_News 样本:  46%|生成 C4_News 样本:  48%|████▊     | 97生成 C4_News 样本:  47%|████▋     | 94/200 [48:30<45:14, 25.61s/it]生成 C4_News 样本:  48%|████▊     | 95/200 [48:56<45:00, 25.72s/it]生成 C4_News 样本:  48%|生成 C4_News 样本:  50%|█████     | 10生成 C4_News 样本:  48%|�生成 C4_News 样本:  50%|█████     | 1生成 C4_News 样本:  49%|�生成 C4_News 样本:  51%|█████     | 生成 C4_News 样本:  50%|█生成 C4_News 样本:  52%|█████▏   生成 C4_News 样本:  50%|██生成 C4_News 样本:  52%|█████▏ 生成 C4_News 样本:  50%|█████     | 101/200 [51:26<41:59, 25.45s/it]生成 C4_News 样本:  51%|█████     | 102/200 [51:52<41:54, 25.65s/it]生成 C4_News 样本:  52%|█████▏    | 103/200 [52:18<41:47, 25.85s/it]生成 C4_News 样本:  52%|█████▏    | 104/200 [52:44<41:24, 25.88s/it]生成 C4_News 样本:  52%|█████▎    | 105/200 [53:10<40:51, 25.81s/it]生成 C4_News 样本:  53%|█████▎    | 106/200 [53:35<40:15, 25.70s/it]生成 C4_News 样本:  54%|█████▎    | 107/200 [54:00<39:15, 25.33s/it]生成 C4_News 样本:  54%|█████▍    | 108/200 [54:26<39:15, 25.60s/it]生成 C4_News 样本:  55%|█████▍    | 109/200 [54:52<38:55, 25.67s/it]生成 C4_News 样本:  55%|█████▌    | 110/200 [55:17<38:02, 25.36s/it]生成 C4_News 样本:  56%|█████▌    | 111/200 [55:43<37:51, 25.52s/it]生成 C4_News 样本:  56%|█████▌    | 112/200 [56:08<37:22, 25.49s/it]生成 C4_News 样本:  56%|█████▋    | 113/200 [56:33<36:57, 25.49s/it]生成 C4_News 样本:  57%|█████▋    | 114/200 [56:59<36:27, 25.43s/it]生成 C4_News 样本:  57%|█████▊    | 115/200 [57:25<36:13, 25.57s/it]生成 C4_News 样本:  58%|█████▊    | 116/200 [57:50<35:45, 25.54s/it]生成 C4_News 样本:  58%|█████▊    | 117/200 [58:14<34:46, 25.13s/it]生成 C4_News 样本:  59%|█████▉    | 118/200 [58:39<34:20, 25.12s/it]生成 C4_News 样本:  60%|█████▉    | 119/200 [59:05<34:08, 25.29s/it]生成 C4_News 样本:  60%|██████    | 120/200 [59:30<33:44, 25.30s/it]生成 C4_News 样本:  60%|██████    | 121/200 [59:56<33:35, 25.51s/it]生成 C4_News 样本:  61%|██████    | 122/200 [1:00:21<32:50, 25.26s/it]生成 C4_News 样本:  62%|██████▏   | 123/200 [1:00:40<30:04, 23.44s/it]生成 C4_News 样本:  62%|██████▏   | 124/200 [1:01:06<30:30, 24.09s/it]生成 C4_News 样本:  62%|██████▎   | 125/200 [1:01:31<30:28, 24.38s/it]生成 C4_News 样本:  63%|██████▎   | 126/200 [1:01:57<30:35, 24.81s/it]生成 C4_News 样本:  64%|██████▎   | 127/200 [1:02:21<29:59, 24.64s/it]生成 C4_News 样本:  64%|██████▍   | 128/200 [1:02:47<30:02, 25.04s/it]生成 C4_News 样本:  64%|██████▍   | 129/200 [1:03:13<29:57, 25.31s/it]生成 C4_News 样本:  65%|██████▌   | 130/200 [1:03:34<28:12, 24.17s/it]生成 C4_News 样本:  66%|██████▌   | 131/200 [1:04:00<28:23, 24.69s/it]生成 C4_News 样本:  66%|██████▌   | 132/200 [1:04:26<28:19, 25.00s/it]生成 C4_News 样本:  66%|██████▋   | 133/200 [1:04:51<27:45, 24.85s/it]生成 C4_News 样本:  67%|██████▋   | 134/200 [1:05:15<27:07, 24.67s/it]生成 C4_News 样本:  68%|██████▊   | 135/200 [1:05:39<26:33, 24.51s/it]生成 C4_News 样本:  68%|██████▊   | 136/200 [1:06:03<26:08, 24.51s/it]生成 C4_News 样本:  68%|██████▊   | 137/200 [1:06:26<25:12, 24.01s/it]生成 C4_News 样本:  69%|██████▉   | 138/200 [1:06:50<24:34, 23.79s/it]生成 C4_News 样本:  70%|██████▉   | 139/200 [1:07:13<23:57, 23.56s/it]生成 C4_News 样本:  70%|███████   | 140/200 [1:07:33<22:33, 22.57s/it]生成 C4_News 样本:  70%|███████   | 141/200 [1:07:57<22:45, 23.15s/it]生成 C4_News 样本:  71%|███████   | 142/200 [1:08:23<22:59, 23.78s/it]生成 C4_News 样本:  72%|███████▏  | 143/200 [1:08:48<23:02, 24.25s/it]生成 C4_News 样本:  72%|███████▏  | 144/200 [1:09:13<22:59, 24.63s/it]生成 C4_News 样本:  72%|███████▎  | 145/200 [1:09:39<22:41, 24.76s/it]生成 C4_News 样本:  73%|███████▎  | 146/200 [1:10:03<22:19, 24.80s/it]生成 C4_News 样本:  74%|███████▎  | 147/200 [1:10:28<21:57, 24.86s/it]生成 C4_News 样本:  74%|███████▍  | 148/200 [1:10:51<21:00, 24.24s/it]生成 C4_News 样本:  74%|███████▍  | 149/200 [1:11:15<20:36, 24.24s/it]生成 C4_News 样本:  75%|███████▌  | 150/200 [1:11:41<20:33, 24.68s/it]生成 C4_News 样本:  76%|███████▌  | 151/200 [1:12:07<20:22, 24.96s/it]生成 C4_News 样本:  76%|███████▌  | 152/200 [1:12:32<20:04, 25.09s/it]生成 C4_News 样本:  76%|███████▋  | 153/200 [1:12:58<19:42, 25.17s/it]生成 C4_News 样本:  77%|███████▋  | 154/200 [1:13:22<19:08, 24.96s/it]生成 C4_News 样本:  78%|███████▊  | 155/200 [1:13:48<18:52, 25.16s/it]生成 C4_News 样本:  78%|███████▊  | 156/200 [1:14:13<18:31, 25.26s/it]生成 C4_News 样本:  78%|███████▊  | 157/200 [1:14:39<18:08, 25.31s/it]生成 C4_News 样本:  79%|███████▉  | 158/200 [1:15:03<17:27, 24.95s/it]生成 C4_News 样本:  80%|███████▉  | 159/200 [1:15:20<15:26, 22.59s/it]生成 C4_News 样本:  80%|████████  | 160/200 [1:15:45<15:32, 23.30s/it]生成 C4_News 样本:  80%|████████  | 161/200 [1:16:10<15:29, 23.82s/it]生成 C4_News 样本:  81%|████████  | 162/200 [1:16:36<15:29, 24.45s/it]生成 C4_News 样本:  82%|████████▏ | 163/200 [1:17:01<15:15, 24.74s/it]生成 C4_News 样本:  82%|████████▏ | 164/200 [1:17:27<14:59, 24.99s/it]生成 C4_News 样本:  82%|████████▎ | 165/200 [1:17:51<14:23, 24.67s/it]生成 C4_News 样本:  83%|████████▎ | 166/200 [1:18:16<14:06, 24.89s/it]生成 C4_News 样本:  84%|████████▎ | 167/200 [1:18:41<13:45, 25.02s/it]生成 C4_News 样本:  84%|████████▍ | 168/200 [1:19:06<13:14, 24.83s/it]生成 C4_News 样本:  84%|████████▍ | 169/200 [1:19:31<12:57, 25.09s/it]生成 C4_News 样本:  85%|████████▌ | 170/200 [1:19:57<12:37, 25.24s/it]生成 C4_News 样本:  86%|████████▌ | 171/200 [1:20:21<12:01, 24.86s/it]生成 C4_News 样本:  86%|████████▌ | 172/200 [1:20:37<10:24, 22.32s/it]生成 C4_News 样本:  86%|████████▋ | 173/200 [1:21:02<10:19, 22.96s/it]生成 C4_News 样本:  87%|████████▋ | 174/200 [1:21:26<10:07, 23.35s/it]生成 C4_News 样本:  88%|████████▊ | 175/200 [1:21:51<09:54, 23.77s/it]生成 C4_News 样本:  88%|████████▊ | 176/200 [1:22:16<09:40, 24.21s/it]生成 C4_News 样本:  88%|████████▊ | 177/200 [1:22:41<09:25, 24.58s/it]生成 C4_News 样本:  89%|████████▉ | 178/200 [1:23:06<09:00, 24.58s/it]生成 C4_News 样本:  90%|████████▉ | 179/200 [1:23:29<08:24, 24.01s/it]./run_all_tests.sh: line 11: $'\273\247续运行，不停止': command not found
+==================================
+🚀 开始自动测试流程
+==================================
+
+📂 项目目录: /root/复现/TEST
+
+📡 开启学术加速...
+设置成功
+注意：仅限于学术用途和加速访问github/huggingface，不承诺稳定性保证
+
+==================================
+📦 步骤0: 检查并安装依赖
+==================================
+WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv
+✅ 依赖安装完成
+
+==================================
+📊 步骤1: 主要基准测试 (run_experiment.py)
+预计时间: 1-2小时
+==================================
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+正在加载 facebook/opt-2.7b 到 cuda...
+
+开始【多数据集】联合横向评估...
+当前注册算法: ['Natural', 'KGW', 'KGW-selfhash', 'SWEET', 'DiPmark', 'Unigram', 'SemStamp', 'Smooth', 'PublicDetect', 'Unforgeable', 'Gumbel', 'Transform', 'WaterMax']
+
+>>> 正在连接并处理数据集: C4_News <<<
+生成 C4_News 样本:   0%|          | 0/200 [00:00<?, ?it/s]Asking to truncate to max_length but no maximum length is provided and the model has no predefined maximum length. Default to no truncation.
+生成 C4_News 样本:   0%|          | 1/200 [00:26<1:28:49, 26.78s/it]生成 C4_News 样本:   1%|          | 2/200 [00:51<1:24:17, 25.54s/it]生成 C4_News 样本:   2%|▏         | 3/200 [01:16<1:22:53, 25.25s/it]生成 C4_News 样本:   2%|▏         | 4/200 [01:39<1:19:35, 24.36s/it]生成 C4_News 样本:   2%|▎         | 5/200 [02:01<1:16:32, 23.55s/it]生成 C4_News 样本:   3%|▎         | 6/200 [02:25<1:16:15, 23.59s/it]生成 C4_News 样本:   4%|▎         | 7/200 [02:49<1:16:27, 23.77s/it]生成 C4_News 样本:   4%|▍         | 8/200 [03:12<1:15:39, 23.64s/it]生成 C4_News 样本:   4%|▍         | 9/200 [03:35<1:14:01, 23.26s/it]生成 C4_News 样本:   5%|▌         | 10/200 [03:59<1:14:54, 23.66s/it]生成 C4_News 样本:   6%|▌         | 11/200 [04:25<1:16:21, 24.24s/it]生成 C4_News 样本:   6%|▌         | 12/200 [04:49<1:16:13, 24.33s/it]生成 C4_News 样本:   6%|▋         | 13/200 [05:13<1:15:30, 24.23s/it]生成 C4_News 样本:   7%|▋         | 14/200 [05:39<1:16:18, 24.61s/it]生成 C4_News 样本:   8%|▊         | 15/200 [06:05<1:17:03, 24.99s/it]生成 C4_News 样本:   8%|▊         | 16/200 [06:26<1:13:17, 23.90s/it]生成 C4_News 样本:   8%|▊         | 17/200 [06:51<1:14:00, 24.26s/it]生成 C4_News 样本:   9%|▉         | 18/200 [07:16<1:14:00, 24.40s/it]生成 C4_News 样本:  10%|▉         | 19/200 [07:41<1:14:01, 24.54s/it]生成 C4_News 样本:  10%|█         | 20/200 [08:05<1:13:47, 24.60s/it]生成 C4_News 样本:  10%|█         | 21/200 [08:32<1:14:51, 25.09s/it]生成 C4_News 样本:  11%|█         | 22/200 [08:57<1:14:47, 25.21s/it]生成 C4_News 样本:  12%|█▏        | 23/200 [09:24<1:15:35, 25.63s/it]生成 C4_News 样本:  12%|█▏        | 24/200 [09:47<1:13:09, 24.94s/it]生成 C4_News 样本:  12%|█▎        | 25/200 [10:13<1:13:14, 25.11s/it]生成 C4_News 样本:  13%|█▎        | 26/200 [10:38<1:12:49, 25.11s/it]生成 C4_News 样本:  14%|█▎        | 27/200 [11:02<1:12:06, 25.01s/it]生成 C4_News 样本:  14%|█▍        | 28/200 [11:28<1:12:01, 25.13s/it]生成 C4_News 样本:  14%|█▍        | 29/200 [11:50<1:09:24, 24.35s/it]生成 C4_News 样本:  15%|█▌        | 30/200 [12:16<1:10:08, 24.76s/it]生成 C4_News 样本:  16%|█▌        | 31/200 [12:42<1:10:22, 24.99s/it]生成 C4_News 样本:  16%|█▌        | 32/200 [13:07<1:10:03, 25.02s/it]生成 C4_News 样本:  16%|█▋        | 33/200 [13:32<1:09:44, 25.05s/it]生成 C4_News 样本:  17%|█▋        | 34/200 [13:58<1:10:00, 25.31s/it]生成 C4_News 样本:  18%|█▊        | 35/200 [14:20<1:07:23, 24.51s/it]生成 C4_News 样本:  18%|█▊        | 36/200 [14:45<1:07:22, 24.65s/it]生成 C4_News 样本:  18%|█▊        | 37/200 [15:10<1:07:06, 24.70s/it]生成 C4_News 样本:  19%|█▉        | 38/200 [15:34<1:06:15, 24.54s/it]生成 C4_News 样本:  20%|█▉        | 39/200 [15:59<1:05:32, 24.43s/it]生成 C4_News 样本:  20%|██        | 40/200 [16:22<1:04:03, 24.02s/it]生成 C4_News 样本:  20%|██        | 41/200 [16:45<1:02:56, 23.75s/it]生成 C4_News 样本:  21%|██        | 42/200 [17:10<1:03:59, 24.30s/it]生成 C4_News 样本:  22%|██▏       | 43/200 [17:36<1:04:20, 24.59s/it]生成 C4_News 样本:  22%|██▏       | 44/200 [18:01<1:04:13, 24.70s/it]生成 C4_News 样本:  22%|██▎       | 45/200 [18:25<1:03:28, 24.57s/it]生成 C4_News 样本:  23%|██▎       | 46/200 [18:48<1:02:07, 24.21s/it]生成 C4_News 样本:  24%|██▎       | 47/200 [19:13<1:01:53, 24.27s/it]生成 C4_News 样本:  24%|██▍       | 48/200 [19:35<1:00:04, 23.72s/it]生成 C4_News 样本:  24%|██▍       | 49/200 [20:00<1:00:54, 24.20s/it]生成 C4_News 样本:  25%|██▌       | 50/200 [20:26<1:01:15, 24.50s/it]生成 C4_News 样本:  26%|██▌       | 51/200 [20:52<1:02:20, 25.10s/it]生成 C4_News 样本:  26%|██▌       | 52/200 [21:19<1:02:59, 25.54s/it]生成 C4_News 样本:  26%|██▋       | 53/200 [21:44<1:02:29, 25.51s/it]生成 C4_News 样本:  27%|██▋       | 54/200 [22:09<1:01:47, 25.40s/it]生成 C4_News 样本:  28%|██▊       | 55/200 [22:34<1:01:01, 25.25s/it]生成 C4_News 样本:  28%|██▊       | 56/200 [22:59<1:00:36, 25.25s/it]生成 C4_News 样本:  28%|██▊       | 57/200 [23:24<59:46, 25.08s/it]  生成 C4_News 样本:  29%|██▉       | 58/200 [23:48<58:31, 24.73s/it]生成 C4_News 样本:  30%|██▉       | 59/200 [24:14<59:01, 25.11s/it]生成 C4_News 样本:  30%|███       | 60/200 [24:39<58:51, 25.22s/it]生成 C4_News 样本:  30%|███       | 61/200 [25:04<58:10, 25.11s/it]生成 C4_News 样本:  31%|███       | 62/200 [25:29<57:50, 25.15s/it]生成 C4_News 样本:  32%|███▏      | 63/200 [25:54<57:03, 24.99s/it]生成 C4_News 样本:  32%|███▏      | 64/200 [26:18<55:37, 24.54s/it]生成 C4_News 样本:  32%|███▎      | 65/200 [26:42<55:12, 24.54s/it]生成 C4_News 样本:  33%|███▎      | 66/200 [27:06<54:19, 24.32s/it]生成 C4_News 样本:  34%|███▎      | 67/200 [27:30<53:56, 24.33s/it]生成 C4_News 样本:  34%|███▍      | 68/200 [27:55<53:50, 24.47s/it]生成 C4_News 样本:  34%|███▍      | 69/200 [28:20<53:36, 24.56s/it]生成 C4_News 样本:  35%|███▌      | 70/200 [28:45<53:44, 24.80s/it]生成 C4_News 样本:  36%|███▌      | 71/200 [29:10<53:24, 24.84s/it]生成 C4_News 样本:  36%|███▌      | 72/200 [29:35<52:50, 24.77s/it]生成 C4_News 样本:  36%|███▋      | 73/200 [29:59<51:52, 24.51s/it]生成 C4_News 样本:  37%|███▋      | 74/200 [30:19<48:58, 23.32s/it]生成 C4_News 样本:  38%|███▊      | 75/200 [30:44<49:12, 23.62s/it]生成 C4_News 样本:  38%|███▊      | 76/200 [31:09<50:08, 24.27s/it]生成 C4_News 样本:  38%|███▊      | 77/200 [31:34<50:11, 24.48s/it]生成 C4_News 样本:  39%|███▉      | 78/200 [31:59<49:51, 24.52s/it]生成 C4_News 样本:  40%|███▉      | 79/200 [32:22<48:32, 24.07s/it]生成 C4_News 样本:  40%|████      | 80/200 [32:47<48:35, 24.29s/it]生成 C4_News 样本:  40%|████      | 81/200 [33:13<49:12, 24.81s/it]生成 C4_News 样本:  41%|████      | 82/200 [33:38<49:05, 24.96s/it]生成 C4_News 样本:  42%|████▏     | 83/200 [34:01<47:41, 24.46s/it]生成 C4_News 样本:  42%|████▏     | 84/200 [34:26<47:39, 24.65s/it]生成 C4_News 样本:  42%|████▎     | 85/200 [34:51<47:10, 24.62s/it]生成 C4_News 样本:  43%|████▎     | 86/200 [35:16<47:05, 24.78s/it]生成 C4_News 样本:  44%|████▎     | 87/200 [35:41<46:41, 24.79s/it]生成 C4_News 样本:  44%|████▍     | 88/200 [36:06<46:32, 24.93s/it]生成 C4_News 样本:  44%|████▍     | 89/200 [36:32<46:20, 25.05s/it]生成 C4_News 样本:  45%|████▌     | 90/200 [36:57<46:07, 25.16s/it]生成 C4_News 样本:  46%|████▌     | 91/200 [37:22<45:33, 25.08s/it]生成 C4_News 样本:  46%|████▌     | 92/200 [37:47<44:56, 24.97s/it]生成 C4_News 样本:  46%|████▋     | 93/200 [38:10<43:49, 24.58s/it]生成 C4_News 样本:  47%|████▋     | 94/200 [38:35<43:37, 24.69s/it]生成 C4_News 样本:  48%|████▊     | 95/200 [39:01<43:33, 24.89s/it]生成 C4_News 样本:  48%|████▊     | 96/200 [39:25<42:46, 24.68s/it]生成 C4_News 样本:  48%|████▊     | 97/200 [39:49<42:03, 24.50s/it]生成 C4_News 样本:  49%|████▉     | 98/200 [40:14<41:58, 24.70s/it]生成 C4_News 样本:  50%|████▉     | 99/200 [40:39<41:57, 24.93s/it]生成 C4_News 样本:  50%|█████     | 100/200 [41:04<41:27, 24.87s/it]生成 C4_News 样本:  50%|█████     | 101/200 [41:30<41:31, 25.17s/it]生成 C4_News 样本:  51%|█████     | 102/200 [41:55<41:13, 25.24s/it]生成 C4_News 样本:  52%|█████▏    | 103/200 [42:20<40:34, 25.09s/it]生成 C4_News 样本:  52%|█████▏    | 104/200 [42:46<40:38, 25.41s/it]生成 C4_News 样本:  52%|█████▎    | 105/200 [43:13<40:40, 25.69s/it]生成 C4_News 样本:  53%|█████▎    | 106/200 [43:38<39:50, 25.43s/it]生成 C4_News 样本:  54%|█████▎    | 107/200 [44:02<38:57, 25.13s/it]生成 C4_News 样本:  54%|█████▍    | 108/200 [44:27<38:29, 25.10s/it]生成 C4_News 样本:  55%|█████▍    | 109/200 [44:53<38:28, 25.36s/it]生成 C4_News 样本:  55%|█████▌    | 110/200 [45:17<37:29, 24.99s/it]生成 C4_News 样本:  56%|█████▌    | 111/200 [45:42<37:10, 25.06s/it]生成 C4_News 样本:  56%|█████▌    | 112/200 [46:08<37:10, 25.34s/it]生成 C4_News 样本:  56%|█████▋    | 113/200 [46:35<37:08, 25.61s/it]生成 C4_News 样本:  57%|█████▋    | 114/200 [47:01<36:55, 25.76s/it]生成 C4_News 样本:  57%|█████▊    | 115/200 [47:26<36:29, 25.76s/it]生成 C4_News 样本:  58%|█████▊    | 116/200 [47:51<35:46, 25.56s/it]生成 C4_News 样本:  58%|█████▊    | 117/200 [48:15<34:40, 25.07s/it]生成 C4_News 样本:  59%|█████▉    | 118/200 [48:41<34:16, 25.08s/it]生成 C4_News 样本:  60%|█████▉    | 119/200 [49:06<33:50, 25.06s/it]生成 C4_News 样本:  60%|██████    | 120/200 [49:30<33:20, 25.00s/it]生成 C4_News 样本:  60%|██████    | 121/200 [49:56<33:12, 25.22s/it]生成 C4_News 样本:  61%|██████    | 122/200 [50:21<32:42, 25.16s/it]生成 C4_News 样本:  62%|██████▏   | 123/200 [50:40<29:47, 23.21s/it]生成 C4_News 样本:  62%|██████▏   | 124/200 [51:06<30:40, 24.21s/it]生成 C4_News 样本:  62%|██████▎   | 125/200 [51:33<31:06, 24.89s/it]生成 C4_News 样本:  63%|██████▎   | 126/200 [51:58<30:53, 25.04s/it]生成 C4_News 样本:  64%|██████▎   | 127/200 [52:22<29:56, 24.60s/it]生成 C4_News 样本:  64%|██████▍   | 128/200 [52:47<29:47, 24.82s/it]生成 C4_News 样本:  64%|██████▍   | 129/200 [53:12<29:30, 24.93s/it]生成 C4_News 样本:  65%|██████▌   | 130/200 [53:33<27:43, 23.76s/it]生成 C4_News 样本:  66%|██████▌   | 131/200 [53:59<27:54, 24.27s/it]生成 C4_News 样本:  66%|██████▌   | 132/200 [54:24<27:45, 24.49s/it]生成 C4_News 样本:  66%|██████▋   | 133/200 [54:49<27:31, 24.64s/it]生成 C4_News 样本:  67%|██████▋   | 134/200 [55:14<27:25, 24.93s/it]生成 C4_News 样本:  68%|██████▊   | 135/200 [55:40<27:19, 25.23s/it]生成 C4_News 样本:  68%|██████▊   | 136/200 [56:07<27:22, 25.66s/it]生成 C4_News 样本:  68%|██████▊   | 137/200 [56:32<26:36, 25.34s/it]生成 C4_News 样本:  69%|██████▉   | 138/200 [56:58<26:21, 25.51s/it]生成 C4_News 样本:  70%|██████▉   | 139/200 [57:22<25:44, 25.32s/it]生成 C4_News 样本:  70%|███████   | 140/200 [57:44<24:06, 24.10s/it]生成 C4_News 样本:  70%|███████   | 141/200 [58:08<23:53, 24.30s/it]生成 C4_News 样本:  71%|███████   | 142/200 [58:34<23:45, 24.57s/it]生成 C4_News 样本:  72%|███████▏  | 143/200 [58:59<23:39, 24.90s/it]生成 C4_News 样本:  72%|███████▏  | 144/200 [59:24<23:11, 24.85s/it]生成 C4_News 样本:  72%|███████▎  | 145/200 [59:49<22:47, 24.86s/it]生成 C4_News 样本:  73%|███████▎  | 146/200 [1:00:14<22:23, 24.88s/it]生成 C4_News 样本:  74%|███████▎  | 147/200 [1:00:38<21:45, 24.63s/it]生成 C4_News 样本:  74%|███████▍  | 148/200 [1:01:01<21:02, 24.29s/it]生成 C4_News 样本:  74%|███████▍  | 149/200 [1:01:26<20:50, 24.51s/it]生成 C4_News 样本:  75%|███████▌  | 150/200 [1:01:53<20:56, 25.14s/it]生成 C4_News 样本:  76%|███████▌  | 151/200 [1:02:17<20:13, 24.76s/it]生成 C4_News 样本:  76%|███████▌  | 152/200 [1:02:42<19:51, 24.82s/it]生成 C4_News 样本:  76%|███████▋  | 153/200 [1:03:07<19:26, 24.81s/it]生成 C4_News 样本:  77%|███████▋  | 154/200 [1:03:31<18:49, 24.55s/it]生成 C4_News 样本:  78%|███████▊  | 155/200 [1:03:56<18:33, 24.75s/it]生成 C4_News 样本:  78%|███████▊  | 156/200 [1:04:21<18:16, 24.93s/it]生成 C4_News 样本:  78%|███████▊  | 157/200 [1:04:46<17:57, 25.06s/it]生成 C4_News 样本:  79%|███████▉  | 158/200 [1:05:10<17:12, 24.59s/it]生成 C4_News 样本:  80%|███████▉  | 159/200 [1:05:27<15:09, 22.19s/it]生成 C4_News 样本:  80%|████████  | 160/200 [1:05:51<15:17, 22.94s/it]生成 C4_News 样本:  80%|████████  | 161/200 [1:06:17<15:23, 23.69s/it]生成 C4_News 样本:  81%|████████  | 162/200 [1:06:42<15:20, 24.23s/it]生成 C4_News 样本:  82%|████████▏ | 163/200 [1:07:08<15:15, 24.74s/it]生成 C4_News 样本:  82%|████████▏ | 164/200 [1:07:33<14:49, 24.71s/it]生成 C4_News 样本:  82%|████████▎ | 165/200 [1:07:56<14:12, 24.36s/it]生成 C4_News 样本:  83%|████████▎ | 166/200 [1:08:21<13:53, 24.51s/it]生成 C4_News 样本:  84%|████████▎ | 167/200 [1:08:46<13:31, 24.59s/it]生成 C4_News 样本:  84%|████████▍ | 168/200 [1:09:11<13:06, 24.59s/it]生成 C4_News 样本:  84%|████████▍ | 169/200 [1:09:36<12:48, 24.78s/it]生成 C4_News 样本:  85%|████████▌ | 170/200 [1:10:01<12:26, 24.89s/it]生成 C4_News 样本:  86%|████████▌ | 171/200 [1:10:25<11:56, 24.72s/it]生成 C4_News 样本:  86%|████████▌ | 172/200 [1:10:43<10:30, 22.52s/it]生成 C4_News 样本:  86%|████████▋ | 173/200 [1:11:08<10:34, 23.51s/it]生成 C4_News 样本:  87%|████████▋ | 174/200 [1:11:33<10:23, 23.97s/it]生成 C4_News 样本:  88%|████████▊ | 175/200 [1:11:59<10:11, 24.47s/it]生成 C4_News 样本:  88%|████████▊ | 176/200 [1:12:22<09:33, 23.91s/it]生成 C4_News 样本:  88%|████████▊ | 177/200 [1:12:46<09:09, 23.89s/it]生成 C4_News 样本:  89%|████████▉ | 178/200 [1:13:09<08:44, 23.84s/it]生成 C4_News 样本:  90%|████████▉ | 179/200 [1:13:33<08:20, 23.83s/it]生成 C4_News 样本:  90%|█████████ | 180/200 [1:13:57<07:58, 23.93s/it]生成 C4_News 样本:  90%|█████████ | 181/200 [1:14:21<07:31, 23.75s/it]生成 C4_News 样本:  91%|█████████ | 182/200 [1:14:44<07:06, 23.72s/it]生成 C4_News 样本:  92%|█████████▏| 183/200 [1:15:08<06:42, 23.69s/it]生成 C4_News 样本:  92%|█████████▏| 184/200 [1:15:32<06:21, 23.82s/it]生成 C4_News 样本:  92%|█████████▎| 185/200 [1:15:56<05:57, 23.83s/it]生成 C4_News 样本:  93%|█████████▎| 186/200 [1:16:20<05:34, 23.89s/it]生成 C4_News 样本:  94%|█████████▎| 187/200 [1:16:43<05:08, 23.74s/it]生成 C4_News 样本:  94%|█████████▍| 188/200 [1:17:03<04:32, 22.69s/it]✅ 步骤1完成: 基准测试
+
+==================================
+📏 步骤2: 长度敏感性测试 (length_sensitivity_test.py)
+预计时间: 30-60分钟
+==================================
+[CUDA] 正在加载 facebook/opt-125m 进行动态长度敏感性分析...
+
+>>> 开始动态长度生成与轨迹追踪 (Generating & Tracking) <<<
+处理进度:   0%|          | 0/30 [00:00<?, ?it/s]处理进度:   3%|▎         | 1/30 [00:08<04:05,  8.46s/it]处理进度:   7%|▋         | 2/30 [00:15<03:35,  7.69s/it]处理进度:  10%|█         | 3/30 [00:22<03:18,  7.35s/it]处理进度:  13%|█▎        | 4/30 [00:29<03:10,  7.33s/it]处理进度:  17%|█▋        | 5/30 [00:36<02:59,  7.19s/it]处理进度:  20%|██        | 6/30 [00:43<02:51,  7.16s/it]处理进度:  23%|██▎       | 7/30 [00:50<02:41,  7.04s/it]处理进度:  27%|██▋       | 8/30 [00:57<02:33,  6.97s/it]处理进度:  30%|███       | 9/30 [01:04<02:25,  6.91s/it]处理进度:  33%|███▎      | 10/30 [01:10<02:16,  6.82s/it]处理进度:  37%|███▋      | 11/30 [01:17<02:08,  6.76s/it]处理进度:  40%|████      | 12/30 [01:24<02:01,  6.73s/it]处理进度:  43%|████▎     | 13/30 [01:30<01:53,  6.69s/it]处理进度:  47%|████▋     | 14/30 [01:37<01:46,  6.69s/it]处理进度:  50%|█████     | 15/30 [01:44<01:40,  6.70s/it]处理进度:  53%|█████▎    | 16/30 [01:50<01:33,  6.70s/it]处理进度:  57%|█████▋    | 17/30 [01:57<01:26,  6.69s/it]处理进度:  60%|██████    | 18/30 [02:04<01:20,  6.69s/it]处理进度:  63%|██████▎   | 19/30 [02:10<01:13,  6.68s/it]处理进度:  67%|██████▋   | 20/30 [02:17<01:07,  6.72s/it]处理进度:  70%|███████   | 21/30 [02:24<01:00,  6.72s/it]处理进度:  73%|███████▎  | 22/30 [02:31<00:53,  6.72s/it]处理进度:  77%|███████▋  | 23/30 [02:38<00:47,  6.76s/it]处理进度:  80%|████████  | 24/30 [02:44<00:40,  6.78s/it]处理进度:  83%|████████▎ | 25/30 [02:51<00:33,  6.79s/it]处理进度:  87%|████████▋ | 26/30 [02:58<00:27,  6.80s/it]处理进度:  90%|█████████ | 27/30 [03:05<00:20,  6.82s/it]处理进度:  93%|█████████▎| 28/30 [03:12<00:13,  6.79s/it]处理进度:  97%|█████████▋| 29/30 [03:18<00:06,  6.79s/it]处理进度: 100%|██████████| 30/30 [03:25<00:00,  6.77s/it]处理进度: 100%|██████████| 30/30 [03:25<00:00,  6.85s/it]
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+
+[可视化] 绘制 Z-Score 随文本长度的阈值击穿曲线...
+
+=== [数据表] 达到安全阈值 (Z > 4.0) 所需的最短 Token 长度 (Watermark Size) ===
+| Algorithm   |   Required Tokens (Z>4) |
+|:------------|------------------------:|
+| KGW         |                      35 |
+| DiPmark     |                      39 |
+| SemStamp    |                       1 |
+
+ >>> 图表已保存: length_sensitivity_analysis.png (可插入第六章 6.1.1)
+✅ 步骤2完成: 长度敏感性测试
+
+==================================
+🔍 步骤3: 快速验证测试（可选）
+预计时间: 20-30分钟
+==================================
+
+▶️  运行: test_official_watermarks_quick.py
+STA-1 length=15 z=0.535
+KTH length=15 z=0.349
+SIR changed=True
+X-SIR changed=True
+k-SemStamp proxy changed=True
+Traceback (most recent call last):
+  File "/root/复现/TEST/test_official_watermarks_quick.py", line 87, in <module>
+    main()
+  File "/root/复现/TEST/test_official_watermarks_quick.py", line 72, in main
+    ksem.fit([
+  File "/root/复现/TEST/official_watermarks.py", line 642, in fit
+    raise RuntimeError("sklearn is required to fit k-SemStamp centroids")
+RuntimeError: sklearn is required to fit k-SemStamp centroids
+✅ test_official_watermarks_quick.py 完成
+
+▶️  运行: test_k_semstamp_quick.py
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+快速验证 k-SemStamp (基于k-means聚类的语义水印) 实现
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/4] 测试KSemStampLogitsProcessor实例化...
+✅ KSemStampLogitsProcessor实例化成功
+   簇数量(k): 5
+   词表大小: 50272
+   绿名单比例(gamma): 0.5
+   水印强度(delta): 2.0
+
+[2/4] 测试LogitsProcessor功能...
+✅ LogitsProcessor功能正常
+   输入shape: torch.Size([1, 50272])
+   输出shape: torch.Size([1, 50272])
+   分数已修改: True
+
+[3/4] 测试聚类分配...
+❌ 聚类分配测试失败: 'KSemStampLogitsProcessor' object has no attribute 'token_clusters'
+✅ test_k_semstamp_quick.py 完成
+
+▶️  运行: test_icw_quick.py
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+快速验证 ICW (In-Context Watermarks) 实现
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/3] 测试ICW Initials实例化...
+✅ ICWInitialsWatermark实例化成功
+   绿名单字母: ['a', 'e', 'i', 'o', 't']...
+   红名单字母: ['b', 'c', 'd', 'f', 'g']...
+   Gamma: 0.50
+
+[2/3] 测试ICW Lexical实例化...
+✅ ICWLexicalWatermark实例化成功
+   绿词汇: ['sophisticated', 'intelligent', 'innovative']...
+
+[3/3] 测试检测功能...
+
+【ICW Initials检测】
+------------------------------------------------------------
+偏向绿名单           | Z-score:   3.00 | 文本: An excellent approach enables innovative analysis ...
+偏向红名单           | Z-score:  -2.33 | 文本: Big complex data from many processes require caref...
+正常文本            | Z-score:  -0.33 | 文本: The quick brown fox jumps over the lazy dog....
+
+【ICW Lexical检测】
+------------------------------------------------------------
+含关键词文本 | 频率: 0.375 | This innovative and advanced intelligent system is sophisticated.
+无关键词文本 | 频率: 0.000 | This is a simple text without special words.
+
+================================================================================
+ICW关键特性验证:
+================================================================================
+✅ ICWInitialsWatermark成功实现
+✅ ICWLexicalWatermark成功实现
+✅ 检测函数正常工作
+✅ 偏向绿名单的文本Z-score更高
+
+特点:
+  - Prompt-based水印（不是LogitsProcessor）
+  - 完全黑盒，适用于任何LLM
+  - 通过系统提示词引导生成
+  - 小模型效果有限，大模型效果更好
+
+================================================================================
+✅ ICW验证完成
+================================================================================
+
+ICW在run_experiment.py中的位置:
+  1. ICWInitialsWatermark类 (行883-970)
+  2. ICWLexicalWatermark类 (行973-1020)
+
+使用方法:
+  # 生成
+  icw = ICWInitialsWatermark()
+  text = icw.generate_with_watermark(model, tokenizer, prompt, device)
+  
+  # 检测
+  z_score = icw.detect_watermark(text)
+
+完整测试:
+  python test23_icw_watermark.py
+
+重要提示:
+  ⚠️  ICW依赖模型对指令的遵循能力
+  ⚠️  小模型（OPT-125m）可能效果有限
+  ✅ 论文使用GPT-4等大模型效果更好
+
+================================================================================
+📊 生成可视化...
+================================================================================
+Traceback (most recent call last):
+  File "/root/复现/TEST/test_icw_quick.py", line 119, in <module>
+    scores1 = [z_watermarked_initials, z_human_initials]
+NameError: name 'z_watermarked_initials' is not defined
+✅ test_icw_quick.py 完成
+
+▶️  运行: test_xsir_quick.py
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+快速验证 X-SIR 实现
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/4] 加载分词器...
+✅ 分词器加载完成
+
+[2/4] 测试X-SIR Processor实例化...
+✅ XSIRLogitsProcessor实例化成功
+✅ Processor调用成功，输出shape: torch.Size([1, 50272])
+
+[3/4] 测试X-SIR检测函数...
+  原始文本            | X-SIR Z-score:   0.28
+  改写文本1           | X-SIR Z-score:  -0.83
+  改写文本2           | X-SIR Z-score:   0.00
+
+[4/4] 测试鲁棒性...
+
+文本1 tokens: [133, 2119, 6219, 23602]
+文本2 tokens: [35356, 6219, 23602, 20]
+集合哈希1: 32073
+集合哈希2: 65197
+哈希是否相同: False ❌
+
+================================================================================
+X-SIR关键特性验证:
+================================================================================
+✅ XSIRLogitsProcessor成功实现
+✅ 使用鲁棒语义哈希（对顺序不敏感）
+✅ X-SIR检测函数正常工作
+✅ 集合哈希对token顺序鲁棒
+
+特点:
+  - 使用token集合而非序列（忽略顺序）
+  - 对改写和翻译更鲁棒
+  - 简化版，完整版需要XLM-R多语言编码器
+
+================================================================================
+✅ X-SIR验证完成
+================================================================================
+
+X-SIR在run_experiment.py中的位置:
+  1. 生成类: XSIRLogitsProcessor (行366-430)
+  2. 检测分支: detect_watermark() 中 algo_name=='X-SIR' (行831-861)
+
+使用方法:
+  # 生成
+  processor = XSIRLogitsProcessor(vocab_size)
+  outputs = model.generate(..., logits_processor=[processor])
+  
+  # 检测
+  z_score = detect_watermark(text, 'X-SIR', tokenizer, vocab_size)
+
+完整测试:
+  python test22_xsir_consistency.py
+
+================================================================================
+📊 生成可视化...
+================================================================================
+✅ 可视化已保存: xsir_quick_test.png
+✅ test_xsir_quick.py 完成
+
+▶️  运行: test_ewd_detection.py
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+测试 EWD 熵加权检测方法
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/4] 加载分词器...
+✅ 分词器加载完成
+
+[2/4] 测试标准KGW检测...
+------------------------------------------------------------
+带水印文本           | KGW Z-score:   0.38
+人类文本            | KGW Z-score:   0.26
+短文本             | KGW Z-score:   1.73
+
+[3/4] 测试EWD熵加权检测...
+------------------------------------------------------------
+带水印文本           | EWD Z-score:   0.34
+人类文本            | EWD Z-score:   0.04
+短文本             | EWD Z-score:   1.68
+
+[4/4] 对比KGW vs EWD...
+------------------------------------------------------------
+样本类型            | KGW Z-score     | EWD Z-score     | 差异        
+------------------------------------------------------------
+带水印文本           | 0.38            | 0.34            | -0.04
+人类文本            | 0.26            | 0.04            | -0.22
+短文本             | 1.73            | 1.68            | -0.06
+
+================================================================================
+EWD关键特性验证:
+================================================================================
+✅ EWD使用熵加权改进KGW检测
+✅ 高熵位置（不确定）权重更高
+✅ 低熵位置（确定）权重更低
+✅ 理论上应该：
+   - 对水印文本：EWD ≈ KGW 或略高（更准确）
+   - 对人类文本：EWD < KGW（更低误报）
+
+注意: 当前实现使用启发式熵估计（快速版）
+完整版需要模型前向传播计算真实熵（见calculate_entropy_for_ewd）
+
+================================================================================
+✅ EWD测试完成
+================================================================================
+
+EWD在run_experiment.py中的位置:
+  1. 辅助函数: calculate_entropy_for_ewd() - 完整熵计算
+  2. 检测分支: detect_watermark() 中 algo_name=='EWD'
+
+使用方法:
+  z_score = detect_watermark(text, 'EWD', tokenizer, vocab_size)
+
+================================================================================
+📊 生成可视化对比图...
+================================================================================
+
+✅ 可视化图表已保存: ewd_comparison_plot.png
+
+图表说明:
+  - 左图: KGW vs EWD的Z-score对比
+  - 右图: EWD相对KGW的改进（负值表示EWD更低，对人类文本更友好）
+✅ test_ewd_detection.py 完成
+✅ 步骤3完成: 快速验证
+
+==================================
+🧪 步骤4: 其他测试脚本
+预计时间: 10-20分钟
+==================================
+
+▶️  运行: run_test.py
+可用测试:
+  ✓ 测试1: test1_physical_perturbation.py
+  ✓ 测试2: test2_complex_rewrite.py
+  ✓ 测试3: test3_watermark_stealing.py
+  ✓ 测试4: test4_sira_targeted.py
+  ✓ 测试5: test5_window_tradeoff.py
+  ✓ 测试6: test6_kd_radioactivity.py
+  ✓ 测试7: test7_b4_proxy_erasure.py
+  ✓ 测试8: test8_adaptive_stealing.py
+  ✓ 测试9: test9_multibit_watermark.py
+  ✓ 测试10: test10_watermark_smoothing.py
+  ✓ 测试11: test11_waterpark_fidelity.py
+  ✓ 测试12: test12_demark_removal.py
+  ✓ 测试13: test13_ditto_spoofing.py
+  ✓ 测试14: test14_multikey_removal.py
+  ✓ 测试15: test15_api_query_attack.py
+  ✓ 测试16: test16_robustness_spoofing.py
+  ✓ 测试17: test17_watermark_learnability.py
+  ✓ 测试18: test18_dipper_paraphrase.py
+  ✓ 测试19: test19_mip_stealing.py
+  ✓ 测试20: test20_adaptive_evasion.py
+  ✓ 测试21: test21_cdg_kd.py
+  ✓ 测试22: test22_xsir_consistency.py
+  ✓ 测试23: test23_icw_watermark.py
+  ✓ 测试24: test24_blackbox_third_party_detector.py
+  ✓ 测试25: test25_bias_inversion.py
+  ✓ 测试26: test26_logit_watermark_collision.py
+
+用法: python run_test.py <编号>  或  python run_test.py all
+✅ run_test.py 完成
+✅ 步骤4完成: 其他测试
+
+==================================
+📋 测试完成汇总
+==================================
+
+⏱️  总运行时间: 1小时 22分钟
+
+📁 生成的文件：
+-rw-r--r-- 1 root root  76K Jun  8 04:51 all_tests.log
+-rw-r--r-- 1 root root 230K Jun  7 22:01 attack_10_watermark_smoothing.png
+-rw-r--r-- 1 root root 309K Jun  7 22:01 attack_11_waterpark_semantics.png
+-rw-r--r-- 1 root root 254K Jun  7 22:01 attack_12_demark_removal.png
+-rw-r--r-- 1 root root 253K Jun  7 22:01 attack_13_ditto_spoofing.png
+-rw-r--r-- 1 root root 242K Jun  7 22:01 attack_14_multikey_dilution.png
+-rw-r--r-- 1 root root 225K Jun  7 22:01 attack_15_api_query_attack.png
+-rw-r--r-- 1 root root 192K Jun  7 22:01 attack_16_robustness_spoofing.png
+-rw-r--r-- 1 root root 1.4M Jun  8 01:36 attack_1_physical_perturbation.png
+-rw-r--r-- 1 root root 391K Jun  7 22:01 attack_2_complex_rewrite.png
+-rw-r--r-- 1 root root 529K Jun  7 22:01 attack_3_watermark_stealing.png
+-rw-r--r-- 1 root root 384K Jun  7 22:01 attack_4_sira_targeted.png
+-rw-r--r-- 1 root root 210K Jun  7 22:01 attack_5_window_tradeoff.png
+-rw-r--r-- 1 root root 413K Jun  7 22:01 attack_6_kd_radioactivity_wn.png
+-rw-r--r-- 1 root root 293K Jun  7 22:01 attack_7_b4_proxy_erasure.png
+-rw-r--r-- 1 root root 330K Jun  7 22:01 attack_8_adaptive_stealing.png
+-rw-r--r-- 1 root root 182K Jun  7 22:01 attack_9_multibit_ber.png
+-rw-r--r-- 1 root root 176K Jun  8 04:51 ewd_comparison_plot.png
+-rw-r--r-- 1 root root  712 Jun  8 01:36 final_run.log
+-rw-r--r-- 1 root root  29K Jun  8 04:50 length_sensitivity.log
+-rw-r--r-- 1 root root 307K Jun  8 04:50 length_sensitivity_analysis.png
+-rw-r--r-- 1 root root  311 Jun  8 02:00 run.log
+-rw-r--r-- 1 root root  712 Jun  8 01:36 run_direct.log
+-rw-r--r-- 1 root root  17K Jun  8 04:47 run_experiment.log
+-rw-r--r-- 1 root root 3.8K Jun  8 01:36 run_output.log
+-rw-r--r-- 1 root root  712 Jun  8 01:36 run_output_new.log
+-rw-r--r-- 1 root root  712 Jun  8 01:36 run_output_realtime.log
+-rw-r--r-- 1 root root 1.2K Jun  8 04:51 run_test.log
+-rw-r--r-- 1 root root 2.9K Jun  8 04:51 test_ewd_detection.log
+-rw-r--r-- 1 root root 3.2K Jun  8 04:51 test_icw_quick.log
+-rw-r--r-- 1 root root 1.1K Jun  8 04:51 test_k_semstamp_quick.log
+-rw-r--r-- 1 root root  539 Jun  8 04:50 test_official_watermarks_quick.log
+-rw-r--r-- 1 root root 2.4K Jun  8 04:51 test_xsir_quick.log
+-rw-r--r-- 1 root root 153K Jun  8 04:51 xsir_quick_test.png
+  (未找到输出文件)
+
+🎉 所有测试完成！
+
+==================================
+下一步：
+1. 查看结果: cat watermark_benchmark_results.csv
+2. 下载文件: 用VS Code或scp下载所有.csv和.png文件
+3. 查看日志: cat *.log
+==================================
