@@ -1,0 +1,117 @@
+================================================================================
+清理说明 - 第四章文件夹清理内容
+================================================================================
+
+📌 问题：第四章文件夹之前有142个文件
+
+📌 原因：复制时把"引用的代码"子文件夹也复制进去了
+
+📌 清理内容：
+
+被删除的是10个GitHub代码仓库（不是论文PDF）：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. AdaptiveStealingWatermark-main
+   - 对应：引用5（Beyond A Fixed Seal: Adaptive Stealing）
+   - 内容：Python代码、README、requirements等
+
+2. B4-watermark-attack-master
+   - 对应：引用6（B⁴ A Black-Box ScruBBing Attack）
+   - 内容：攻击代码实现
+
+3. CharacterRemoval4WM-master
+   - 对应：引用8（Character-Level Perturbations）
+   - 内容：字符级扰动攻击代码
+
+4. De-mark-main
+   - 对应：引用14（De-mark Watermark Removal）
+   - 内容：水印移除代码
+
+5. Self-information-Rewrite-Attack-main
+   - 对应：引用10（Self-Information Rewrite Attacks）
+   - 内容：自信息重写攻击代码
+
+6. WaterPark-master
+   - 对应：测试中用到的工具
+   - 内容：水印评估框架代码
+
+7. Watermark-Radioactivity-Attack-main
+   - 对应：水印放射性攻击
+   - 内容：攻击代码
+
+8. ditto-main
+   - 对应：引用17（DITTO）
+   - 内容：DITTO攻击实现代码
+
+9. multi-bit-text-watermark-master
+   - 对应：引用7（Robust Multi-bit Text Watermark）
+   - 内容：多比特水印代码
+
+10. watermark_smoothing-main
+    - 对应：引用9（Watermark Smoothing Attacks）
+    - 内容：水印平滑攻击代码
+
+这些文件夹包含：
+- Python源代码 (.py)
+- README.md
+- requirements.txt
+- 数据集文件
+- 模型文件
+- 配置文件
+- 等等...
+
+总共约130+个文件（每个仓库10-20个文件）
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 保留的内容：
+
+第四章的19个论文PDF：
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ 引用1（Knowledge Distillation）.pdf
+✅ 引用2（Prompt Injection Attacks）.pdf
+✅ 引用3（Watermark under Fire）.pdf
+✅ 引用4（Black-Box Detection）.pdf
+✅ 引用5（Adaptive Stealing）.pdf
+✅ 引用6（B⁴ Scrubbing Attack）.pdf
+✅ 引用7（Multi-bit Paraphrasers）.pdf
+✅ 引用8（Character-Level Perturbations）.pdf
+✅ 引用9（Watermark Smoothing）.pdf
+✅ 引用10（Self-Information Rewrite）.pdf
+✅ 引用11（Bias Inversion）.pdf
+✅ 引用12（Logit-based Collision）.pdf
+✅ 引用13（Watermark Stealing）.pdf
+✅ 引用14（De-mark Removal）.pdf
+✅ 引用15（RLCracker）.pdf
+✅ 引用16（Adaptive Robust）.pdf
+✅ 引用17（DITTO）.pdf
+✅ 引用18（Google's System）.pdf
+✅ 引用19（RLSpoofer）.pdf
+
+这些都是论文PDF，是你需要的 ✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 总结：
+
+删除的：10个代码仓库（~130个代码文件）❌ 不需要
+保留的：19个论文PDF ✅ 你需要的
+
+原因：
+- 汇总文件夹是为了整理**论文PDF**
+- 代码仓库已经在原始位置：E:\大模型水印\综述\文章\第四章引用\引用的代码\
+- 你的代码实现在：E:\大模型水印\综述\复现\run_experiment.py 和 test*.py
+
+所以清理是正确的！✅
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📌 如果需要这些代码：
+
+这些GitHub代码仓库仍然在原位置：
+E:\大模型水印\综述\文章\第四章引用\引用的代码\
+
+你可以随时访问它们，不需要复制到汇总文件夹。
+
+================================================================================
