@@ -1,0 +1,262 @@
+[CUDA] 正在加载 facebook/opt-125m 进行动态长度敏感性分析...
+
+>>> 开始动态长度生成与轨迹追踪 (Generating & Tracking) <<<
+处理进度:   0%|          | 0/30 [00:00<?, ?it/s]处理进度:   3%|▎         | 1/30 [00:08<04:05,  8.46s/it]处理进度:   7%|▋         | 2/30 [00:15<03:35,  7.69s/it]处理进度:  10%|█         | 3/30 [00:22<03:18,  7.35s/it]处理进度:  13%|█▎        | 4/30 [00:29<03:10,  7.33s/it]处理进度:  17%|█▋        | 5/30 [00:36<02:59,  7.19s/it]处理进度:  20%|██        | 6/30 [00:43<02:51,  7.16s/it]处理进度:  23%|██▎       | 7/30 [00:50<02:41,  7.04s/it]处理进度:  27%|██▋       | 8/30 [00:57<02:33,  6.97s/it]处理进度:  30%|███       | 9/30 [01:04<02:25,  6.91s/it]处理进度:  33%|███▎      | 10/30 [01:10<02:16,  6.82s/it]处理进度:  37%|███▋      | 11/30 [01:17<02:08,  6.76s/it]处理进度:  40%|████      | 12/30 [01:24<02:01,  6.73s/it]处理进度:  43%|████▎     | 13/30 [01:30<01:53,  6.69s/it]处理进度:  47%|████▋     | 14/30 [01:37<01:46,  6.69s/it]处理进度:  50%|█████     | 15/30 [01:44<01:40,  6.70s/it]处理进度:  53%|█████▎    | 16/30 [01:50<01:33,  6.70s/it]处理进度:  57%|█████▋    | 17/30 [01:57<01:26,  6.69s/it]处理进度:  60%|██████    | 18/30 [02:04<01:20,  6.69s/it]处理进度:  63%|██████▎   | 19/30 [02:10<01:13,  6.68s/it]处理进度:  67%|██████▋   | 20/30 [02:17<01:07,  6.72s/it]处理进度:  70%|███████   | 21/30 [02:24<01:00,  6.72s/it]处理进度:  73%|███████▎  | 22/30 [02:31<00:53,  6.72s/it]处理进度:  77%|███████▋  | 23/30 [02:38<00:47,  6.76s/it]处理进度:  80%|████████  | 24/30 [02:44<00:40,  6.78s/it]处理进度:  83%|████████▎ | 25/30 [02:51<00:33,  6.79s/it]处理进度:  87%|████████▋ | 26/30 [02:58<00:27,  6.80s/it]处理进度:  90%|█████████ | 27/30 [03:05<00:20,  6.82s/it]处理进度:  93%|█████████▎| 28/30 [03:12<00:13,  6.79s/it]处理进度:  97%|█████████▋| 29/30 [03:18<00:06,  6.79s/it]处理进度: 100%|██████████| 30/30 [03:25<00:00,  6.77s/it]处理进度: 100%|██████████| 30/30 [03:25<00:00,  6.85s/it]
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+findfont: Generic family 'sans-serif' not found because none of the following families were found: Arial
+
+[可视化] 绘制 Z-Score 随文本长度的阈值击穿曲线...
+
+=== [数据表] 达到安全阈值 (Z > 4.0) 所需的最短 Token 长度 (Watermark Size) ===
+| Algorithm   |   Required Tokens (Z>4) |
+|:------------|------------------------:|
+| KGW         |                      35 |
+| DiPmark     |                      39 |
+| SemStamp    |                       1 |
+
+ >>> 图表已保存: length_sensitivity_analysis.png (可插入第六章 6.1.1)

@@ -1,0 +1,29 @@
+可用测试:
+  ✓ 测试1: test1_physical_perturbation.py
+  ✓ 测试2: test2_complex_rewrite.py
+  ✓ 测试3: test3_watermark_stealing.py
+  ✓ 测试4: test4_sira_targeted.py
+  ✓ 测试5: test5_window_tradeoff.py
+  ✓ 测试6: test6_kd_radioactivity.py
+  ✓ 测试7: test7_b4_proxy_erasure.py
+  ✓ 测试8: test8_adaptive_stealing.py
+  ✓ 测试9: test9_multibit_watermark.py
+  ✓ 测试10: test10_watermark_smoothing.py
+  ✓ 测试11: test11_waterpark_fidelity.py
+  ✓ 测试12: test12_demark_removal.py
+  ✓ 测试13: test13_ditto_spoofing.py
+  ✓ 测试14: test14_multikey_removal.py
+  ✓ 测试15: test15_api_query_attack.py
+  ✓ 测试16: test16_robustness_spoofing.py
+  ✓ 测试17: test17_watermark_learnability.py
+  ✓ 测试18: test18_dipper_paraphrase.py
+  ✓ 测试19: test19_mip_stealing.py
+  ✓ 测试20: test20_adaptive_evasion.py
+  ✓ 测试21: test21_cdg_kd.py
+  ✓ 测试22: test22_xsir_consistency.py
+  ✓ 测试23: test23_icw_watermark.py
+  ✓ 测试24: test24_blackbox_third_party_detector.py
+  ✓ 测试25: test25_bias_inversion.py
+  ✓ 测试26: test26_logit_watermark_collision.py
+
+用法: python run_test.py <编号>  或  python run_test.py all

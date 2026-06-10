@@ -1,0 +1,251 @@
+"""测试8: 自适应水印窃取攻击 (Adaptive Stealing Attack, AS)"""
+from test_common import *
+import hashlib
+
+print_test_header("自适应水印窃取攻击 (Adaptive Stealing Attack)")
+
+# ============================================================
+# KGW 水印核心函数 (匹配 watermark/config/KGW.json)
+#   gamma=0.5, delta=2.0, hash_key=15485863,
+#   prefix_length=3, f_scheme="skip", window_scheme="left"
+# ============================================================
+KGW_GAMMA = 0.5
+KGW_HASH_KEY = 15485863
+KGW_PREFIX_LENGTH = 3
+
+def _hash_context(ctx_tokens, hash_key=KGW_HASH_KEY):
+    ctx_bytes = str(ctx_tokens).encode("utf-8")
+    key_bytes = str(hash_key).encode("utf-8")
+    full_hash = hashlib.sha256(ctx_bytes + key_bytes).digest()
+    return int.from_bytes(full_hash, "big") % (2**31 - 1)
+
+def _get_green_mask(ctx_tokens, vocab_size, gamma=KGW_GAMMA, hash_key=KGW_HASH_KEY):
+    seed = _hash_context(ctx_tokens, hash_key)
+    torch.manual_seed(seed)
+    return torch.rand(vocab_size) < gamma
+
+def detect_kgw(text, tokenizer, vocab_size, gamma=KGW_GAMMA,
+               hash_key=KGW_HASH_KEY, prefix_length=KGW_PREFIX_LENGTH):
+    """KGW Z-Score 检测器 (prefix_length=3, SHA256哈希)"""
+    tokens = tokenizer.encode(text, return_tensors="pt")[0].tolist()
+    if len(tokens) <= prefix_length:
+        return 0.0
+    green_count, total_count = 0, 0
+    for i in range(prefix_length, len(tokens)):
+        # 跳过超出 vocab_size 的 token
+        if tokens[i] >= vocab_size:
+            continue
+        # 检查上下文 tokens 是否也在范围内
+        ctx = tokens[i - prefix_length : i]
+        if any(t >= vocab_size for t in ctx):
+            continue
+
+        if _get_green_mask(ctx, vocab_size, gamma, hash_key)[tokens[i]].item():
+            green_count += 1
+        total_count += 1
+    if total_count == 0:
+        return 0.0
+    expected = gamma * total_count
+    std = math.sqrt(gamma * (1 - gamma) * total_count)
+    return (green_count - expected) / std
+
+# ============================================================
+# 模拟水印 Oracle: 模拟查询带 KGW 水印的模型 API
+#   每次 API 调用 → 给一个前缀 → 返回按绿名单偏置采样的 token
+#   绿词 logit 加 delta=2.0 的偏置 (与 KGW config 一致)
+# ============================================================
+class WatermarkedOracle:
+    def __init__(self, vocab_size, gamma=KGW_GAMMA, hash_key=KGW_HASH_KEY,
+                 prefix_length=KGW_PREFIX_LENGTH, delta=2.0):
+        self.vocab_size = vocab_size
+        self.gamma = gamma
+        self.hash_key = hash_key
+        self.prefix_length = prefix_length
+        self.delta = delta
+
+    def query(self, prefix_tokens):
+        if len(prefix_tokens) < self.prefix_length:
+            return random.randint(0, self.vocab_size - 1)
+        ctx = prefix_tokens[-self.prefix_length :]
+        green_mask = _get_green_mask(ctx, self.vocab_size, self.gamma, self.hash_key)
+        weights = torch.ones(self.vocab_size)
+        weights[green_mask] = math.exp(self.delta)
+        return torch.multinomial(weights / weights.sum(), 1).item()
+
+# ============================================================
+# 前缀频率估计: 从语料统计高频3-gram前缀
+#   自适应窃取的核心: 优先查询高频前缀 → 有限预算下最大化覆盖
+# ============================================================
+def estimate_prefix_freq(texts, tokenizer, prefix_length=KGW_PREFIX_LENGTH):
+    freq = {}
+    for text in texts:
+        tokens = tokenizer.encode(text, return_tensors="pt")[0].tolist()
+        for i in range(prefix_length, len(tokens)):
+            ctx = tuple(tokens[i - prefix_length : i])
+            freq[ctx] = freq.get(ctx, 0) + 1
+    return freq
+
+# ============================================================
+# 规则窃取: 随机 vs 自适应
+# ============================================================
+def steal_rules(oracle, prefix_freq, budget, is_adaptive=False):
+    if is_adaptive:
+        sorted_prefixes = sorted(prefix_freq.items(), key=lambda x: x[1], reverse=True)
+        num_prefixes = min(len(sorted_prefixes), max(1, budget // 5))
+        selected = [p[0] for p in sorted_prefixes[:num_prefixes]]
+    else:
+        all_prefixes = list(prefix_freq.keys())
+        num_prefixes = min(len(all_prefixes), max(1, budget // 5))
+        selected = random.sample(all_prefixes, num_prefixes)
+
+    stolen = {}
+    queries_per_ctx = max(1, budget // len(selected))
+    for ctx in selected:
+        token_counts = {}
+        for _ in range(queries_per_ctx):
+            tok = oracle.query(list(ctx))
+            token_counts[tok] = token_counts.get(tok, 0) + 1
+        sorted_toks = sorted(token_counts.items(), key=lambda x: x[1], reverse=True)
+        top_k = int(oracle.gamma * oracle.vocab_size)
+        stolen[ctx] = set(t[0] for t in sorted_toks[:top_k])
+    return stolen
+
+def evaluate_accuracy(stolen_rules, oracle):
+    if not stolen_rules:
+        return 0.0
+    accs = []
+    for ctx, stolen_green in stolen_rules.items():
+        true_green = set(torch.where(
+            _get_green_mask(list(ctx), oracle.vocab_size, oracle.gamma, oracle.hash_key)
+        )[0].tolist())
+        if true_green:
+            accs.append(len(stolen_green & true_green) / len(true_green))
+    return sum(accs) / len(accs) if accs else 0.0
+
+# ============================================================
+# 伪造攻击: 使用窃取规则生成带水印文本
+# ============================================================
+def forge_watermarked_text(stolen_rules, prompt, tokenizer, oracle, max_new_tokens=200):
+    tokens = tokenizer.encode(prompt, return_tensors="pt")[0].tolist()
+    for _ in range(max_new_tokens):
+        if len(tokens) >= oracle.prefix_length:
+            ctx = tuple(tokens[-oracle.prefix_length :])
+        else:
+            ctx = None
+        if ctx is None or ctx not in stolen_rules:
+            tokens.append(random.randint(0, oracle.vocab_size - 1))
+            continue
+        stolen_green = stolen_rules[ctx]
+        weights = torch.ones(oracle.vocab_size)
+        for g in stolen_green:
+            weights[g] = math.exp(oracle.delta)
+        tokens.append(torch.multinomial(weights / weights.sum(), 1).item())
+        if tokens[-1] == tokenizer.eos_token_id:
+            break
+    return tokenizer.decode(tokens, skip_special_tokens=True)
+
+# ============================================================
+# 主实验: 比较不同 API 预算下 随机窃取 vs 自适应窃取
+# ============================================================
+print(">>> 模拟 AdaptiveStealingWatermark: 低 API 预算下窃取规则 → 伪造水印文本")
+
+oracle = WatermarkedOracle(vocab_size)
+
+sample_texts = df.dropna(subset=["Text_KGW"]).head(50)["Text_KGW"].tolist()
+prefix_freq = estimate_prefix_freq(sample_texts, detector_tokenizer)
+
+query_budgets = [100, 500, 1000, 2500, 5000, 10000]
+as_results = {"Queries": query_budgets,
+              "Random_ZScore": [], "Adaptive_ZScore": [],
+              "Random_Accuracy": [], "Adaptive_Accuracy": []}
+
+prompt_list = [""] * 5  # 无条件生成 (空prompt)
+
+for queries in tqdm(query_budgets, desc="测试不同 API 查询预算"):
+    stolen_rand = steal_rules(oracle, prefix_freq, queries, is_adaptive=False)
+    acc_rand = evaluate_accuracy(stolen_rand, oracle)
+
+    stolen_adap = steal_rules(oracle, prefix_freq, queries, is_adaptive=True)
+    acc_adap = evaluate_accuracy(stolen_adap, oracle)
+
+    z_rand_total, z_adap_total = 0, 0
+    for prompt in prompt_list:
+        forged_rand = forge_watermarked_text(stolen_rand, prompt, detector_tokenizer, oracle)
+        z_rand_total += detect_kgw(forged_rand, detector_tokenizer, vocab_size)
+
+        forged_adap = forge_watermarked_text(stolen_adap, prompt, detector_tokenizer, oracle)
+        z_adap_total += detect_kgw(forged_adap, detector_tokenizer, vocab_size)
+
+    as_results["Random_ZScore"].append(z_rand_total / 5)
+    as_results["Adaptive_ZScore"].append(z_adap_total / 5)
+    as_results["Random_Accuracy"].append(acc_rand)
+    as_results["Adaptive_Accuracy"].append(acc_adap)
+
+df_as = pd.DataFrame(as_results)
+df_as.set_index("Queries", inplace=True)
+
+print("\n=== [数据表] 自适应窃取 vs 随机窃取 ===")
+print(df_as.T.round(3).to_string())
+
+# --- 绘图 ---
+fig8 = plt.figure(figsize=(16, 6))
+gs8 = fig8.add_gridspec(1, 2, width_ratios=[2, 1.2])
+ax8_1 = fig8.add_subplot(gs8[0])
+ax8_2 = fig8.add_subplot(gs8[1])
+
+ax8_1.plot(df_as.index, df_as["Random_Accuracy"], marker='o', linewidth=3, markersize=8,
+           color='#1f77b4', label='Random Stealing (Baseline)')
+ax8_1.plot(df_as.index, df_as["Adaptive_Accuracy"], marker='^', linewidth=3, markersize=8,
+           color='#d62728', label='Adaptive Stealing (AS)')
+ax8_1.set_title('Test 8: Stolen Rule Accuracy (Adaptive vs Random)', fontsize=14, fontweight='bold')
+ax8_1.set_xlabel('API Query Budget', fontsize=13)
+ax8_1.set_ylabel('Green List Recovery Accuracy', fontsize=13)
+ax8_1.set_xscale('log')
+ax8_1.set_xticks(query_budgets)
+ax8_1.get_xaxis().set_major_formatter(plt.ScalarFormatter())
+ax8_1.legend(loc='lower right')
+ax8_1.grid(True, alpha=0.3)
+
+ax8_2.plot(df_as.index, df_as["Random_ZScore"], marker='o', linewidth=3, markersize=8,
+           color='#1f77b4', label='Random Stealing (Baseline)')
+ax8_2.plot(df_as.index, df_as["Adaptive_ZScore"], marker='^', linewidth=3, markersize=8,
+           color='#d62728', label='Adaptive Stealing (AS)')
+ax8_2.axhline(y=4.0, color='#d9534f', linestyle='--', linewidth=2,
+              label='Threshold (z=4.0)')
+ax8_2.set_title('Test 8: Forged Text Z-Score (Adaptive vs Random)', fontsize=14, fontweight='bold')
+ax8_2.set_xlabel('API Query Budget', fontsize=13)
+ax8_2.set_ylabel('Z-Score of Forged Text', fontsize=13)
+ax8_2.set_xscale('log')
+ax8_2.set_xticks(query_budgets)
+ax8_2.get_xaxis().set_major_formatter(plt.ScalarFormatter())
+ax8_2.legend(loc='lower right')
+ax8_2.grid(True, alpha=0.3)
+
+# 右表: 数据汇总
+summary_table_8 = df_as.round(3).reset_index()
+# 缩短列名以避免挤压
+summary_table_8.rename(columns={
+    'Queries': 'Budget',
+    'Random_Accuracy': 'Rand_Acc',
+    'Adaptive_Accuracy': 'Adap_Acc',
+    'Random_ZScore': 'Rand_Z',
+    'Adaptive_ZScore': 'Adap_Z'
+}, inplace=True)
+table8_data = summary_table_8[['Budget', 'Rand_Acc', 'Adap_Acc', 'Rand_Z', 'Adap_Z']]
+# ax8_2 用于汇总表, 重新调整布局
+fig8.delaxes(ax8_2)
+ax8_2 = fig8.add_subplot(gs8[1])
+ax8_2.axis('off')
+ax8_2.set_title('Data Summary', fontsize=13, fontweight='bold', pad=10)
+tab8 = ax8_2.table(cellText=table8_data.values, colLabels=table8_data.columns,
+                    loc='center', cellLoc='center')
+tab8.auto_set_font_size(False)
+tab8.set_fontsize(9)  # 减小字体
+tab8.scale(1.2, 2.5)  # 增加宽度
+
+plt.tight_layout()
+plt.savefig("attack_8_adaptive_stealing.png", dpi=300, bbox_inches='tight')
+print(">>> 图表已保存: attack_8_adaptive_stealing.png")
+plt.show()
+plt.close()
+print("=== 测试8完成 ===\n")

@@ -1,0 +1,22 @@
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+快速验证 k-SemStamp (基于k-means聚类的语义水印) 实现
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/4] 测试KSemStampLogitsProcessor实例化...
+✅ KSemStampLogitsProcessor实例化成功
+   簇数量(k): 5
+   词表大小: 50272
+   绿名单比例(gamma): 0.5
+   水印强度(delta): 2.0
+
+[2/4] 测试LogitsProcessor功能...
+✅ LogitsProcessor功能正常
+   输入shape: torch.Size([1, 50272])
+   输出shape: torch.Size([1, 50272])
+   分数已修改: True
+
+[3/4] 测试聚类分配...
+❌ 聚类分配测试失败: 'KSemStampLogitsProcessor' object has no attribute 'token_clusters'

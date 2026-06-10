@@ -1,0 +1,13 @@
+STA-1 length=15 z=0.535
+KTH length=15 z=0.349
+SIR changed=True
+X-SIR changed=True
+k-SemStamp proxy changed=True
+Traceback (most recent call last):
+  File "/root/复现/TEST/test_official_watermarks_quick.py", line 87, in <module>
+    main()
+  File "/root/复现/TEST/test_official_watermarks_quick.py", line 72, in main
+    ksem.fit([
+  File "/root/复现/TEST/official_watermarks.py", line 642, in fit
+    raise RuntimeError("sklearn is required to fit k-SemStamp centroids")
+RuntimeError: sklearn is required to fit k-SemStamp centroids

@@ -1,0 +1,75 @@
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+快速验证 ICW (In-Context Watermarks) 实现
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/3] 测试ICW Initials实例化...
+✅ ICWInitialsWatermark实例化成功
+   绿名单字母: ['a', 'e', 'i', 'o', 't']...
+   红名单字母: ['b', 'c', 'd', 'f', 'g']...
+   Gamma: 0.50
+
+[2/3] 测试ICW Lexical实例化...
+✅ ICWLexicalWatermark实例化成功
+   绿词汇: ['sophisticated', 'intelligent', 'innovative']...
+
+[3/3] 测试检测功能...
+
+【ICW Initials检测】
+------------------------------------------------------------
+偏向绿名单           | Z-score:   3.00 | 文本: An excellent approach enables innovative analysis ...
+偏向红名单           | Z-score:  -2.33 | 文本: Big complex data from many processes require caref...
+正常文本            | Z-score:  -0.33 | 文本: The quick brown fox jumps over the lazy dog....
+
+【ICW Lexical检测】
+------------------------------------------------------------
+含关键词文本 | 频率: 0.375 | This innovative and advanced intelligent system is sophisticated.
+无关键词文本 | 频率: 0.000 | This is a simple text without special words.
+
+================================================================================
+ICW关键特性验证:
+================================================================================
+✅ ICWInitialsWatermark成功实现
+✅ ICWLexicalWatermark成功实现
+✅ 检测函数正常工作
+✅ 偏向绿名单的文本Z-score更高
+
+特点:
+  - Prompt-based水印（不是LogitsProcessor）
+  - 完全黑盒，适用于任何LLM
+  - 通过系统提示词引导生成
+  - 小模型效果有限，大模型效果更好
+
+================================================================================
+✅ ICW验证完成
+================================================================================
+
+ICW在run_experiment.py中的位置:
+  1. ICWInitialsWatermark类 (行883-970)
+  2. ICWLexicalWatermark类 (行973-1020)
+
+使用方法:
+  # 生成
+  icw = ICWInitialsWatermark()
+  text = icw.generate_with_watermark(model, tokenizer, prompt, device)
+  
+  # 检测
+  z_score = icw.detect_watermark(text)
+
+完整测试:
+  python test23_icw_watermark.py
+
+重要提示:
+  ⚠️  ICW依赖模型对指令的遵循能力
+  ⚠️  小模型（OPT-125m）可能效果有限
+  ✅ 论文使用GPT-4等大模型效果更好
+
+================================================================================
+📊 生成可视化...
+================================================================================
+Traceback (most recent call last):
+  File "/root/复现/TEST/test_icw_quick.py", line 119, in <module>
+    scores1 = [z_watermarked_initials, z_human_initials]
+NameError: name 'z_watermarked_initials' is not defined

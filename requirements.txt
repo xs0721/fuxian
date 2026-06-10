@@ -1,0 +1,12 @@
+torch
+transformers
+datasets
+scipy
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+mplcursors
+tabulate
+tqdm

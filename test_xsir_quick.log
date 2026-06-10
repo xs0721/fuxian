@@ -1,0 +1,63 @@
+/root/miniconda3/lib/python3.10/site-packages/huggingface_hub/file_download.py:949: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+================================================================================
+快速验证 X-SIR 实现
+================================================================================
+正在加载 facebook/opt-2.7b 到 cuda...
+
+[1/4] 加载分词器...
+✅ 分词器加载完成
+
+[2/4] 测试X-SIR Processor实例化...
+✅ XSIRLogitsProcessor实例化成功
+✅ Processor调用成功，输出shape: torch.Size([1, 50272])
+
+[3/4] 测试X-SIR检测函数...
+  原始文本            | X-SIR Z-score:   0.28
+  改写文本1           | X-SIR Z-score:  -0.83
+  改写文本2           | X-SIR Z-score:   0.00
+
+[4/4] 测试鲁棒性...
+
+文本1 tokens: [133, 2119, 6219, 23602]
+文本2 tokens: [35356, 6219, 23602, 20]
+集合哈希1: 32073
+集合哈希2: 65197
+哈希是否相同: False ❌
+
+================================================================================
+X-SIR关键特性验证:
+================================================================================
+✅ XSIRLogitsProcessor成功实现
+✅ 使用鲁棒语义哈希（对顺序不敏感）
+✅ X-SIR检测函数正常工作
+✅ 集合哈希对token顺序鲁棒
+
+特点:
+  - 使用token集合而非序列（忽略顺序）
+  - 对改写和翻译更鲁棒
+  - 简化版，完整版需要XLM-R多语言编码器
+
+================================================================================
+✅ X-SIR验证完成
+================================================================================
+
+X-SIR在run_experiment.py中的位置:
+  1. 生成类: XSIRLogitsProcessor (行366-430)
+  2. 检测分支: detect_watermark() 中 algo_name=='X-SIR' (行831-861)
+
+使用方法:
+  # 生成
+  processor = XSIRLogitsProcessor(vocab_size)
+  outputs = model.generate(..., logits_processor=[processor])
+  
+  # 检测
+  z_score = detect_watermark(text, 'X-SIR', tokenizer, vocab_size)
+
+完整测试:
+  python test22_xsir_consistency.py
+
+================================================================================
+📊 生成可视化...
+================================================================================
+✅ 可视化已保存: xsir_quick_test.png

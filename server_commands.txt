@@ -1,0 +1,49 @@
+### 服务器操作指南 ###
+
+连接信息：
+- 地址: root@region-46.seetacloud.com
+- 端口: 52914
+- 密码: XOXoleaqZFux
+
+=== 方案1: 手动上传文件（推荐） ===
+
+1. 使用 WinSCP 或其他 SFTP 工具
+   - 上传文件: test9_multibit_watermark.py
+   - 目标路径: /root/复现/TEST/
+
+2. 或使用命令行（需要手动输入密码）:
+   scp -P 52914 test9_multibit_watermark.py root@region-46.seetacloud.com:/root/复现/TEST/
+
+=== 方案2: 在服务器上直接修改 ===
+
+1. 连接到服务器:
+   ssh -p 52914 root@region-46.seetacloud.com
+
+2. 编辑文件:
+   cd /root/复现/TEST
+   nano test9_multibit_watermark.py
+
+3. 找到第 454-476 行，在 "if not torch.cuda.is_available():" 后面添加检查点检测代码
+
+4. 或者直接在服务器上下载检查点:
+   mkdir -p /root/复现/文章/第四章引用/引用的代码/multi-bit-text-watermark-master/ckpt
+   cd /root/复现/文章/第四章引用/引用的代码/multi-bit-text-watermark-master/ckpt
+
+   # 使用 wget 或 Python 下载
+   python3 << 'EOF'
+from huggingface_hub import hf_hub_download
+import os
+downloaded = hf_hub_download(
+    repo_id="xiaojunxu/WatermarkDecoder-Qwen2.5-1.5b",
+    filename="v_head.pt",
+    local_dir=".",
+    local_dir_use_symlinks=False
+)
+import shutil
+shutil.move("v_head.pt", "WatermarkDecoder-v_head.pt")
+print("✅ 下载完成")
+EOF
+
+5. 重新运行测试:
+   cd /root/复现/TEST
+   python test9_multibit_watermark.py
