@@ -1,0 +1,399 @@
+================================================================================
+28_CWRA-X-SIR (Cross-lingual) 复现方案
+================================================================================
+论文: Can Watermarks Survive Translation? On the Cross-lingual Consistency
+      of Text Watermark for Large Language Models (ACL 2024)
+作者: Zhiwei He et al.
+GitHub: https://github.com/zwhe99/X-SIR
+================================================================================
+
+一、X-SIR核心思想
+================================================================================
+
+X-SIR是SIR（Semantic Invariant Robust）的跨语言扩展版本
+
+问题背景:
+    - 标准水印（如KGW）在翻译后完全失效
+    - Token序列改变 → 绿名单不同 → 检测失败
+    - 需要跨语言一致的水印方案
+
+X-SIR解决方案:
+    1. 使用跨语言语义编码器（如XLM-R, mBERT）
+    2. 提取语言无关的语义表示
+    3. 基于语义表示生成绿名单（而非token ID）
+    4. 翻译后语义相似 → 绿名单相似 → 水印保持
+
+关键创新:
+    - CWRA (Cross-lingual Watermark Robustness Analysis) 评估框架
+    - X-SIR算法：跨语言语义不变水印
+    - 在中英、英中、多语言翻译场景下保持水印
+
+================================================================================
+二、为什么复现困难？
+================================================================================
+
+需要的额外资源:
+❌ 1. 多语言模型（XLM-R, mBERT, mT5等）
+    - 需要额外下载多个大模型
+    - 内存和计算开销大
+
+❌ 2. 翻译模型（MarianMT, NLLB等）
+    - 用于测试跨语言一致性
+    - 需要多个翻译方向的模型
+
+❌ 3. 多语言测试数据
+    - 中英对照数据集
+    - 多语言并行语料
+
+❌ 4. 语义编码器集成
+    - 需要在生成时调用语义编码器
+    - 增加推理时间和复杂度
+
+当前环境限制:
+    - run_experiment.py 基于单语言模型（OPT-125m）
+    - 没有配置多语言模型
+    - 测试数据为英文
+
+================================================================================
+三、复现方案（三种选择）
+================================================================================
+
+方案A: 完整复现（最准确，但复杂）
+────────────────────────────────────────────────────────
+
+需要添加:
+1. 多语言语义编码器
+```python
+from transformers import AutoModel, AutoTokenizer
+
+# XLM-R编码器
+xlmr_model = AutoModel.from_pretrained("xlm-roberta-base")
+xlmr_tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
+
+class XSIRLogitsProcessor(LogitsProcessor):
+    def __init__(self, vocab_size, semantic_model, gamma=0.5, delta=2.0):
+        self.vocab_size = vocab_size
+        self.semantic_model = semantic_model  # XLM-R或mBERT
+        self.gamma = gamma
+        self.delta = delta
+
+    def _get_semantic_embedding(self, context_ids):
+        """提取跨语言语义嵌入"""
+        with torch.no_grad():
+            outputs = self.semantic_model(context_ids)
+            # 使用[CLS] token或池化表示
+            semantic_vec = outputs.last_hidden_state[:, 0, :]  # [CLS]
+        return semantic_vec
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            # 获取语义嵌入
+            semantic_vec = self._get_semantic_embedding(input_ids[b])
+
+            # 基于语义向量生成绿名单（而非token ID）
+            semantic_hash = int(semantic_vec.sum().item() * 1e6) % (2**31)
+            g = torch.Generator(device='cpu')
+            g.manual_seed(semantic_hash)
+
+            greenlist_size = int(self.vocab_size * self.gamma)
+            perm = torch.randperm(self.vocab_size, generator=g)
+            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
+
+        return scores
+```
+
+2. 翻译测试流程
+```python
+# 英→中翻译
+translator_en2zh = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-en-zh")
+
+# 检测原文
+z_score_en = detect_watermark(text_en, "X-SIR", tokenizer_en, vocab_size)
+
+# 翻译
+text_zh = translate(text_en, translator_en2zh)
+
+# 检测译文
+z_score_zh = detect_watermark(text_zh, "X-SIR", tokenizer_zh, vocab_size)
+
+# 评估一致性
+consistency = abs(z_score_en - z_score_zh) < threshold
+```
+
+优点: ✅ 完全符合论文
+缺点: ❌ 需要多语言模型，复杂度高
+
+
+方案B: 简化版复现（推荐）
+────────────────────────────────────────────────────────
+
+核心思想: 在单语言环境中模拟跨语言语义一致性
+
+实现策略:
+1. 不使用真实的多语言模型
+2. 用"伪语义哈希"模拟语义不变性
+3. 测试改写而非翻译（改写类似翻译的语义保持）
+
+```python
+class XSIRSimplifiedLogitsProcessor(LogitsProcessor):
+    """X-SIR简化版：用上下文聚合模拟跨语言语义"""
+    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863):
+        self.vocab_size = vocab_size
+        self.gamma = gamma
+        self.delta = delta
+        self.hash_key = hash_key
+
+    def _semantic_hash_robust(self, context_ids):
+        """鲁棒语义哈希：对token顺序和小变化不敏感"""
+        # 方法1: 使用token的集合而非序列
+        token_set = sorted(set(context_ids[-8:]))  # 去重+排序
+        h = 0
+        for token_id in token_set:
+            h = (h + int(token_id)) % (2**31 - 1)
+        return h ^ self.hash_key
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            # 鲁棒语义哈希
+            semantic_seed = self._semantic_hash_robust(input_ids[b].tolist())
+            g = torch.Generator(device='cpu')
+            g.manual_seed(semantic_seed)
+
+            greenlist_size = int(self.vocab_size * self.gamma)
+            perm = torch.randperm(self.vocab_size, generator=g)
+            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
+
+        return scores
+```
+
+测试方法:
+```python
+# 生成原文
+text1 = generate_with_watermark(prompt, XSIRSimplifiedLogitsProcessor)
+
+# 用DIPPER改写（模拟翻译）
+text2 = paraphrase_with_dipper(text1)
+
+# 检测一致性
+z1 = detect_watermark(text1, "X-SIR-Simplified", ...)
+z2 = detect_watermark(text2, "X-SIR-Simplified", ...)
+
+# 评估：改写后Z-score应该保持相近
+consistency = abs(z1 - z2) / z1 < 0.3  # 30%以内视为一致
+```
+
+优点: ✅ 无需多语言模型，易实现
+缺点: ⚠️ 不是真正的跨语言，只是鲁棒性测试
+
+
+方案C: 仅添加占位符（最简单）
+────────────────────────────────────────────────────────
+
+如果只是为了代码完整性，不实际使用：
+
+```python
+class XSIRLogitsProcessor(LogitsProcessor):
+    """X-SIR占位符：需要多语言模型支持"""
+    def __init__(self, vocab_size, gamma=0.5, delta=2.0):
+        self.vocab_size = vocab_size
+        self.gamma = gamma
+        self.delta = delta
+        print("⚠️ X-SIR需要多语言模型，当前使用SIR简化版")
+
+    def __call__(self, input_ids, scores):
+        # 降级到标准SIR
+        from run_experiment import SIRLogitsProcessor
+        sir = SIRLogitsProcessor(self.vocab_size, self.gamma, self.delta)
+        return sir(input_ids, scores)
+```
+
+优点: ✅ 快速添加，保持代码完整
+缺点: ❌ 实际上就是SIR
+
+================================================================================
+四、推荐实现方案
+================================================================================
+
+【推荐】方案B - 简化版复现
+
+理由:
+1. ✅ 可以在现有环境中运行
+2. ✅ 体现X-SIR的核心思想（语义鲁棒性）
+3. ✅ 用改写测试代替翻译测试
+4. ✅ 实现难度适中
+
+具体步骤:
+1. 添加XSIRSimplifiedLogitsProcessor到run_experiment.py
+2. 创建test22_xsir_crosslingual.py测试文件
+3. 用DIPPER改写模拟跨语言场景
+4. 评估改写前后的Z-score一致性
+
+================================================================================
+五、实现代码（方案B）
+================================================================================
+
+【添加到run_experiment.py】
+
+```python
+class XSIRLogitsProcessor(LogitsProcessor):
+    """X-SIR: Cross-lingual Semantic Invariant Robust Watermark (ACL 2024)
+
+    简化版实现：用鲁棒语义哈希模拟跨语言一致性
+    完整版需要XLM-R等多语言编码器
+    """
+    def __init__(self, vocab_size, gamma=0.5, delta=2.0, hash_key=15485863,
+                 aggregation='set'):
+        self.vocab_size = vocab_size
+        self.gamma = gamma
+        self.delta = delta
+        self.hash_key = hash_key
+        self.aggregation = aggregation  # 'set' or 'bag'
+
+    def _semantic_hash_robust(self, context_ids):
+        """鲁棒语义哈希：对token顺序和小变化不敏感
+
+        策略：
+        - 使用集合（set）而非序列，忽略顺序
+        - 或使用词袋（bag），计数但不考虑位置
+        """
+        context = context_ids[-8:]  # 取最后8个token作为上下文
+
+        if self.aggregation == 'set':
+            # 方法1: 集合哈希（最鲁棒）
+            token_set = sorted(set(context))
+            h = sum(token_set) % (2**31 - 1)
+        elif self.aggregation == 'bag':
+            # 方法2: 词袋哈希（考虑频率）
+            from collections import Counter
+            token_bag = Counter(context)
+            h = sum(token_id * count for token_id, count in token_bag.items())
+            h = h % (2**31 - 1)
+        else:
+            # 方法3: 加权求和（权重相同）
+            h = sum(context) % (2**31 - 1)
+
+        return h ^ self.hash_key
+
+    def __call__(self, input_ids, scores):
+        for b in range(input_ids.shape[0]):
+            # 计算鲁棒语义哈希
+            semantic_seed = self._semantic_hash_robust(input_ids[b].tolist())
+
+            # 基于语义生成绿名单
+            g = torch.Generator(device='cpu')
+            g.manual_seed(semantic_seed)
+            greenlist_size = int(self.vocab_size * self.gamma)
+            perm = torch.randperm(self.vocab_size, generator=g)
+
+            scores[b, perm[:greenlist_size].to(scores.device)] += self.delta
+
+        return scores
+```
+
+【检测函数扩展】
+
+在detect_watermark()中添加：
+
+```python
+elif algo_name == "X-SIR":
+    """X-SIR检测：使用鲁棒语义哈希"""
+    green_tokens_count = 0
+
+    for i in range(1, len(tokens)):
+        # 获取上下文
+        context = tokens[max(0, i-8):i].tolist()
+
+        # 鲁棒语义哈希（与生成时一致）
+        token_set = sorted(set(context))
+        semantic_hash = sum(token_set) % (2**31 - 1)
+        semantic_seed = semantic_hash ^ secret_key
+
+        # 检测绿名单
+        g = torch.Generator(device='cpu')
+        g.manual_seed(semantic_seed)
+        greenlist_size = int(vocab_size * gamma)
+        perm = torch.randperm(vocab_size, generator=g)
+        greenlist = set(perm[:greenlist_size].tolist())
+
+        if tokens[i].item() in greenlist:
+            green_tokens_count += 1
+
+    variance = total_tokens * gamma * (1 - gamma)
+    if variance == 0: return 0.0
+    z_score = (green_tokens_count - total_tokens * gamma) / math.sqrt(variance)
+    return z_score
+```
+
+================================================================================
+六、测试验证
+================================================================================
+
+创建test22_xsir_crosslingual.py:
+
+```python
+"""test22: X-SIR跨语言水印一致性测试（简化版）
+
+用改写测试代替真实翻译，验证语义鲁棒性
+"""
+from test_common import *
+
+# 生成X-SIR水印文本
+processor = XSIRLogitsProcessor(vocab_size)
+text_original = generate(prompt, processor)
+
+# 用DIPPER深度改写（模拟翻译）
+text_paraphrased = paraphrase_with_dipper(text_original)
+
+# 检测一致性
+z_original = detect_watermark(text_original, "X-SIR", ...)
+z_paraphrased = detect_watermark(text_paraphrased, "X-SIR", ...)
+
+# 评估
+consistency_score = 1 - abs(z_original - z_paraphrased) / max(z_original, 1)
+
+print(f"原文Z-score: {z_original:.2f}")
+print(f"改写后Z-score: {z_paraphrased:.2f}")
+print(f"一致性: {consistency_score:.2%}")
+
+# 对比标准KGW
+z_kgw_original = detect_watermark(text_original, "KGW", ...)
+z_kgw_paraphrased = detect_watermark(text_paraphrased, "KGW", ...)
+kgw_consistency = 1 - abs(z_kgw_original - z_kgw_paraphrased) / max(z_kgw_original, 1)
+
+print(f"\nKGW一致性: {kgw_consistency:.2%}")
+print(f"X-SIR一致性: {consistency_score:.2%}")
+print(f"改进: {(consistency_score - kgw_consistency)*100:.1f}%")
+```
+
+预期结果:
+- X-SIR改写后Z-score下降 < 30%
+- KGW改写后Z-score下降 > 70%
+- X-SIR显著优于KGW
+
+================================================================================
+七、总结
+================================================================================
+
+复现难度评估:
+- 完整版（真实多语言）: ⭐⭐⭐⭐⭐ 非常困难
+- 简化版（鲁棒哈希）:   ⭐⭐⭐☆☆ 中等
+- 占位符版本:           ⭐☆☆☆☆ 简单
+
+推荐方案:
+✅ 方案B - 简化版复现
+    - 用鲁棒语义哈希代替多语言编码器
+    - 用DIPPER改写测试代替翻译测试
+    - 可以验证核心思想，无需额外模型
+
+实现优先级:
+1. 如果需要完整复现论文 → 方案A（需要投入大量资源）
+2. 如果需要验证核心思想 → 方案B（推荐）
+3. 如果只是代码完整性 → 方案C（快速）
+
+下一步:
+1. 决定采用哪个方案
+2. 实现XSIRLogitsProcessor
+3. 创建test22测试文件
+4. 验证改写一致性
+
+================================================================================

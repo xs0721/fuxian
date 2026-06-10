@@ -1,0 +1,88 @@
+第三章论文 vs 复现代码对比分析
+================================================================================
+
+已复现的水印算法（run_experiment.py）：
+✅ KGW (10_KGW_2301.10226)
+✅ KGW-SelfHash (10_KGW扩展)
+✅ SWEET (12_SWEET)
+✅ EWD (13_EWD) - 熵加权检测方法 ⭐ 新增
+✅ DiPmark (14_DiPmark)
+✅ STA-1 (15_STA-1) - 无偏低风险水印 ⭐ 新增
+✅ Unigram (16_Unigram-Watermark)
+✅ TBW (17_TBW) - 主题水印 ⭐ 新增
+✅ SemStamp (25_SemStamp)
+✅ SIR (27_SIR) - 语义不变鲁棒水印 ⭐ 新增
+✅ KTH (34_KTH) - 无失真水印 ⭐ 新增
+✅ SmoothedWatermark (平滑水印)
+✅ PubliclyDetectable (公开可检测)
+✅ Unforgeable (UPV - 36_UPV)
+
+已复现的攻击算法（test*.py）：
+✅ test1: 物理扰动攻击
+✅ test2: 复杂改写攻击
+✅ test3: 水印窃取攻击 (20_Watermark-Stealing)
+✅ test4: SIRA目标攻击
+✅ test5: 窗口权衡攻击
+✅ test6: 知识蒸馏放射性攻击 (39_Radioactivity + 41_WN)
+✅ test7: B4代理擦除攻击 (23_B4-Scrubbing-Attack)
+✅ test8: 自适应窃取攻击
+✅ test9: 多比特水印攻击
+✅ test10: 水印平滑攻击
+✅ test11: WaterPark保真度攻击
+✅ test12: DEMARK移除攻击
+✅ test13: DITTO伪造攻击
+✅ test14: 多密钥移除攻击
+✅ test15: API查询攻击
+✅ test16: 鲁棒性伪造攻击
+✅ test17: 水印可学习性攻击 (38_Learnability-of-Watermarks)
+
+================================================================================
+缺失的水印算法（需要添加到run_experiment.py）：
+================================================================================
+
+✅ 13_EWD (Entropy-Weighted Detection) - 已完成 ⭐
+✅ 15_STA-1 (Unbiased Low-risk) - 已完成 ⭐
+✅ 17_TBW (Topic-Based Watermarks) - 已完成 ⭐
+✅ 27_SIR (Semantic Invariant Robust) - 已完成 ⭐
+✅ 28_CWRA-X-SIR (Cross-lingual) - 已完成（简化版）⭐ 新增
+✅ 34_KTH (Distortion-free) - 已完成 ⭐
+
+❌ 30_AWT (Adversarial Watermarking Transformer) - 复杂度高
+❌ 31_REMARK-LLM - 端到端优化，实现复杂
+❌ 32_ICW (In-Context Watermarks) - 需要特殊架构
+❌ 33_RL-Watermark (强化学习框架) - 实现复杂
+
+================================================================================
+缺失的攻击算法（需要创建test*.py）：
+================================================================================
+
+✅ 19_DIPPER (深度改写攻击) - test18 已完成 ⭐
+✅ 22_MIP (混合整数规划窃取) - test19 已完成 ⭐
+✅ 29_Adaptive-Evasion (边界逃逸攻击) - test20 已完成 ⭐
+✅ 40_CDG-KD (对比解码引导蒸馏) - test21 已完成 ⭐
+
+================================================================================
+优先级建议：
+================================================================================
+
+高优先级（核心论文）：
+1. 15_STA-1 - ACL 2025最新无偏水印
+2. 27_SIR - ICLR 2024语义不变鲁棒水印
+3. 34_KTH - ICLR 2024无失真水印
+4. 19_DIPPER - NeurIPS 2023核心攻击（已在test2中部分实现？）
+5. 22_MIP - ACSAC 2024数学优化攻击
+
+中优先级（创新方法）：
+6. 17_TBW - 主题水印
+7. 28_X-SIR - 跨语言扩展
+8. 31_REMARK-LLM - USENIX Security 2024
+9. 32_ICW - ICLR 2026上下文水印
+10. 29_Adaptive-Evasion - ICML 2025自适应逃逸
+
+低优先级（特殊场景）：
+11. 30_AWT - IEEE S&P 2021早期工作
+12. 33_RL-Watermark - EACL 2026强化学习（复杂度高）
+13. 13_EWD - 检测改进（非生成算法）
+14. 40_CDG-KD - 蒸馏攻击变体
+
+================================================================================
